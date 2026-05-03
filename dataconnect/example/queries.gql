@@ -182,3 +182,27 @@ query GetStateCodes @auth(level: PUBLIC, insecureReason: "State codes are public
     name
   }
 }
+
+query GetMyAgreements @auth(level: USER) {
+  lawyerClientAgreements(
+    where: { lawyerId: { eq_expr: "auth.uid" } }
+    orderBy: [{ createdAt: DESC }]
+  ) {
+    id
+    caseId
+    lawyerId
+    message
+    createdAt
+    updatedAt
+    lawyerClientAgreementFiles_on_agreement(orderBy: [{ createdAt: ASC }]) {
+      id
+      agreementId
+      fileName
+      storagePath
+      publicUrl
+      contentType
+      fileSize
+      createdAt
+    }
+  }
+}

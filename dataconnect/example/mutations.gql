@@ -196,3 +196,39 @@ mutation CreateDocument(
     }
   )
 }
+
+mutation CreateLawyerClientAgreement(
+  $caseId: UUID!
+  $message: String
+  $fileName: String!
+  $storagePath: String!
+  $publicUrl: String
+  $contentType: String
+  $fileSize: Int
+) @auth(expr: "auth.token.role == 'lawyer'") @transaction {
+  query @redact {
+    case(key: { id: $caseId }) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  lawyerClientAgreement_insert(
+    data: {
+      caseId: $caseId
+      lawyerId_expr: "auth.uid"
+      message: $message
+      createdAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  )
+  lawyerClientAgreementFile_insert(
+    data: {
+      agreementId_expr: "response.lawyerClientAgreement_insert.id"
+      fileName: $fileName
+      storagePath: $storagePath
+      publicUrl: $publicUrl
+      contentType: $contentType
+      fileSize: $fileSize
+      createdAt_expr: "request.time"
+    }
+  )
+}

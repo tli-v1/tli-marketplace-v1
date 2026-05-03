@@ -2,6 +2,21 @@
   "dataconnect": {
     "source": "dataconnect"
   },
+  "hosting": {
+    "site": "peak-bit-486121-n6-74a84",
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
   "firestore": {
     "rules": "firestore.rules"
   },
