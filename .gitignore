@@ -1,0 +1,47 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# local agent skill packs
+.agents/
+skills-lock.json
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.env
+
+# Ignore markdown by default
+*.md
+
+# Keep public/project docs
+!README.md
+!CHANGELOG.md
+!CONTRIBUTING.md
+!docs/**/*.md
+
+
+.firebase/*
+.claude/*
+.windsurf/*
+dataconnect/.dataconnect/
+*.generated.dart
+src/dataconnect-generated*
+dist/assets/*
