@@ -1,0 +1,198 @@
+mutation EnsureUserProfile(
+  $fullName: String
+  $phone: String
+  $role: String!
+) @auth(level: USER) {
+  userProfile_upsert(
+    data: {
+      userId_expr: "auth.uid"
+      fullName: $fullName
+      phone: $phone
+      role: $role
+      createdAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateCase(
+  $consentStore: Boolean!
+  $consentContact: Boolean!
+) @auth(level: USER) {
+  case_insert(
+    data: {
+      userId_expr: "auth.uid"
+      status: PENDING
+      consentStore: $consentStore
+      consentContact: $consentContact
+      consentAt_expr: "request.time"
+      createdAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation DeleteCase($caseId: UUID!) @auth(level: USER) {
+  case_delete(
+    first: {
+      where: {
+        id: { eq: $caseId }
+        userId: { eq_expr: "auth.uid" }
+      }
+    }
+  )
+}
+
+mutation CreateIncident(
+  $caseId: UUID!
+  $description: String!
+  $incidentDate: Date!
+  $city: String
+  $stateCode: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  incident_insert(
+    data: {
+      caseId: $caseId
+      description: $description
+      incidentDate: $incidentDate
+      city: $city
+      stateCode: $stateCode
+      createdAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateDamages(
+  $caseId: UUID!
+  $medicalBillsUsd: Float
+  $daysMissed: Int
+  $dailyRateUsd: Float
+  $lostWagesUsd: Float
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  damage_insert(
+    data: {
+      caseId: $caseId
+      medicalBillsUsd: $medicalBillsUsd
+      daysMissed: $daysMissed
+      dailyRateUsd: $dailyRateUsd
+      lostWagesUsd: $lostWagesUsd
+    }
+  )
+}
+
+mutation CreateCaseContact(
+  $caseId: UUID!
+  $fullName: String
+  $method: ContactMethod!
+  $email: String
+  $phone: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  caseContact_insert(
+    data: {
+      caseId: $caseId
+      fullName: $fullName
+      method: $method
+      email: $email
+      phone: $phone
+    }
+  )
+}
+
+mutation CreateParty(
+  $caseId: UUID!
+  $role: PartyRole!
+  $name: String!
+  $insurerName: String
+  $policyNumber: String
+  $claimNumber: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  party_insert(
+    data: {
+      caseId: $caseId
+      role: $role
+      name: $name
+      insurerName: $insurerName
+      policyNumber: $policyNumber
+      claimNumber: $claimNumber
+      createdAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateDocument(
+  $caseId: UUID!
+  $kind: DocKind!
+  $originalFilename: String
+  $storagePath: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  document_insert(
+    data: {
+      caseId: $caseId
+      kind: $kind
+      originalFilename: $originalFilename
+      storagePath: $storagePath
+      uploadedBy_expr: "auth.uid"
+      uploadedAt_expr: "request.time"
+    }
+  )
+}

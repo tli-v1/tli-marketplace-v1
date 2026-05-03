@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isLawyer() {
+      return signedIn() && request.auth.token.role == 'lawyer';
+    }
+
+    match /case-documents/{allPaths=**} {
+      allow read: if isLawyer();
+      allow write: if false;
+    }
+
+    match /case-docs/{allPaths=**} {
+      allow read: if isLawyer();
+      allow write: if false;
+    }
+
+    match /cases/{caseId}/{allPaths=**} {
+      allow read: if isLawyer();
+      allow write: if false;
+    }
+
+    match /case_documents/{allPaths=**} {
+      allow read: if isLawyer();
+      allow write: if false;
+    }
+
+    match /documents/{allPaths=**} {
+      allow read: if isLawyer();
+      allow write: if false;
+    }
+
+    match /agreements/{lawyerId}/{caseId}/{fileName} {
+      allow read: if isLawyer() && request.auth.uid == lawyerId;
+      allow create: if isLawyer()
+        && request.auth.uid == lawyerId
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow update, delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

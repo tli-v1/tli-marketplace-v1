@@ -1,0 +1,184 @@
+query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
+  cases(orderBy: [{ createdAt: DESC }]) {
+    id
+    userId
+    status
+    consentStore
+    consentContact
+    consentAt
+    createdAt
+    updatedAt
+    incidents_on_case(limit: 1) {
+      id
+      caseId
+      city
+      stateCode
+      incidentDate
+      description
+      createdAt
+    }
+    damage_on_case {
+      caseId
+      medicalBillsUsd
+      daysMissed
+      dailyRateUsd
+      lostWagesUsd
+    }
+    caseContact_on_case {
+      caseId
+      fullName
+      method
+      email
+      phone
+    }
+    parties_on_case {
+      id
+      caseId
+      role
+      name
+      insurerName
+      policyNumber
+      claimNumber
+      createdAt
+    }
+    documents_on_case(orderBy: [{ uploadedAt: DESC }]) {
+      id
+      caseId
+      kind
+      originalFilename
+      storagePath
+      uploadedBy
+      uploadedAt
+      notes
+    }
+    lawyerClientAgreements_on_case(orderBy: [{ createdAt: DESC }]) {
+      id
+      caseId
+      lawyerId
+      message
+      createdAt
+      updatedAt
+      lawyerClientAgreementFiles_on_agreement {
+        id
+        agreementId
+        fileName
+        storagePath
+        publicUrl
+        contentType
+        fileSize
+        createdAt
+      }
+    }
+  }
+}
+
+query GetUserCases @auth(level: USER) {
+  cases(
+    where: { userId: { eq_expr: "auth.uid" } }
+    orderBy: [{ createdAt: DESC }]
+  ) {
+    id
+    status
+    createdAt
+    incidents_on_case(limit: 1) {
+      city
+      stateCode
+    }
+    documents_on_case {
+      id
+    }
+    lawyerClientAgreements_on_case {
+      id
+    }
+  }
+}
+
+query GetCaseDetails($caseId: UUID!) @auth(level: USER) {
+  case(first: { where: { id: { eq: $caseId }, userId: { eq_expr: "auth.uid" } } }) {
+    id
+    userId
+    status
+    consentStore
+    consentContact
+    consentAt
+    createdAt
+    updatedAt
+    incidents_on_case(limit: 1) {
+      id
+      caseId
+      city
+      stateCode
+      incidentDate
+      description
+      createdAt
+    }
+    damage_on_case {
+      caseId
+      medicalBillsUsd
+      daysMissed
+      dailyRateUsd
+      lostWagesUsd
+    }
+    caseContact_on_case {
+      caseId
+      fullName
+      method
+      email
+      phone
+    }
+    parties_on_case {
+      id
+      caseId
+      role
+      name
+      insurerName
+      policyNumber
+      claimNumber
+      createdAt
+    }
+    documents_on_case(orderBy: [{ uploadedAt: DESC }]) {
+      id
+      caseId
+      kind
+      originalFilename
+      storagePath
+      uploadedBy
+      uploadedAt
+      notes
+    }
+    lawyerClientAgreements_on_case(orderBy: [{ createdAt: DESC }]) {
+      id
+      caseId
+      lawyerId
+      message
+      createdAt
+      updatedAt
+      lawyerClientAgreementFiles_on_agreement {
+        id
+        agreementId
+        fileName
+        storagePath
+        publicUrl
+        contentType
+        fileSize
+        createdAt
+      }
+    }
+  }
+}
+
+query GetUserProfile @auth(level: USER) {
+  userProfile(key: { userId_expr: "auth.uid" }) {
+    userId
+    fullName
+    phone
+    role
+  }
+}
+
+query GetStateCodes @auth(level: PUBLIC, insecureReason: "State codes are public reference data") {
+  stateCodes(where: { active: { eq: true } }, orderBy: [{ code: ASC }]) {
+    code
+    name
+  }
+}

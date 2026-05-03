@@ -117,13 +117,6 @@ function App() {
         setRoleChecked(true)
         return
       }
-      if (cachedRole === 'denied') {
-        setIsAuthorized(false)
-        setRoleChecked(true)
-        setSignInMessage('You do not have the appropriate access to view the marketplace.')
-        await signOut()
-        return
-      }
       setRoleChecked(false)
       const { isAuthorized, error } = await checkLawyerAccess(session.user.id)
       const isLawyer = isAuthorized
@@ -146,6 +139,9 @@ function App() {
     const loadCases = async () => {
       setError('')
       try {
+        if (!authChecked) {
+          return
+        }
         if (!session) {
           console.log('Fetch cases skipped: no session')
           setCases([])
@@ -179,7 +175,7 @@ function App() {
     }
 
     loadCases()
-  }, [session, roleChecked, isAuthorized])
+  }, [authChecked, session, roleChecked, isAuthorized])
 
   useEffect(() => {
     const fetchUserIdentity = async () => {

@@ -1,0 +1,129 @@
+type Incident @table {
+  caseId: UUID!
+  case: Case! @ref(fields: "caseId")
+  description: String!
+  incidentDate: Date!
+  city: String
+  createdAt: Timestamp!
+  stateCode: String
+  state: StateCode @ref(fields: "stateCode")
+}
+
+type StateCode @table(key: ["code"]) {
+  code: String!
+  name: String!
+  active: Boolean!
+}
+
+type UserProfile @table(key: ["userId"]) {
+  userId: String! @default(expr: "auth.uid")
+  role: String!
+  fullName: String
+  phone: String
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type Case @table {
+  id: UUID! @default(expr: "uuidV4()")
+  userId: String!
+  user: UserProfile! @ref(fields: "userId")
+  status: CaseStatus!
+  consentStore: Boolean
+  consentContact: Boolean
+  consentAt: Timestamp
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type Party @table {
+  id: UUID! @default(expr: "uuidV4()")
+  caseId: UUID!
+  case: Case! @ref(fields: "caseId")
+  role: PartyRole!
+  name: String!
+  insurerName: String
+  policyNumber: String
+  claimNumber: String
+  createdAt: Timestamp!
+}
+
+type Damage @table(key: ["caseId"]) {
+  caseId: UUID!
+  case: Case! @ref(fields: "caseId")
+  medicalBillsUsd: Float
+  daysMissed: Int
+  dailyRateUsd: Float
+  lostWagesUsd: Float
+}
+
+type CaseContact @table(key: ["caseId"]) {
+  caseId: UUID!
+  case: Case! @ref(fields: "caseId")
+  fullName: String
+  method: ContactMethod!
+  email: String
+  phone: String
+}
+
+type Document @table {
+  id: UUID! @default(expr: "uuidV4()")
+  caseId: UUID!
+  case: Case! @ref(fields: "caseId")
+  kind: DocKind!
+  originalFilename: String
+  storagePath: String
+  uploadedBy: String!
+  uploader: UserProfile! @ref(fields: "uploadedBy")
+  uploadedAt: Timestamp!
+  notes: String
+}
+
+type LawyerClientAgreement @table {
+  id: UUID! @default(expr: "uuidV4()")
+  caseId: UUID!
+  case: Case! @ref(fields: "caseId")
+  lawyerId: String!
+  lawyer: UserProfile! @ref(fields: "lawyerId")
+  message: String
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type LawyerClientAgreementFile @table {
+  id: UUID! @default(expr: "uuidV4()")
+  agreementId: UUID!
+  agreement: LawyerClientAgreement! @ref(fields: "agreementId")
+  fileName: String!
+  storagePath: String!
+  publicUrl: String
+  contentType: String
+  fileSize: Int
+  createdAt: Timestamp!
+}
+
+enum CaseStatus {
+  OPEN
+  CLOSED
+  PENDING
+}
+
+enum PartyRole {
+  PLAINTIFF
+  DEFENDANT
+  INSURER
+  WITNESS
+}
+
+enum ContactMethod {
+  EMAIL
+  PHONE
+  TEXT
+}
+
+enum DocKind {
+  MEDICAL_BILL
+  POLICE_REPORT
+  PHOTO
+  OTHER
+}

@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isLawyer() {
+      return signedIn() && request.auth.token.role == 'lawyer';
+    }
+
+    match /cases/{caseId} {
+      allow read: if isLawyer();
+      allow write: if false;
+    }
+
+    match /state_codes/{stateCodeId} {
+      allow read: if isLawyer();
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if isLawyer() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /agreements/{agreementId} {
+      allow read: if isLawyer() && resource.data.lawyer_id == request.auth.uid;
+      allow create: if isLawyer() && request.resource.data.lawyer_id == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
