@@ -45,3 +45,6 @@ dataconnect/.dataconnect/
 *.generated.dart
 src/dataconnect-generated*
 dist/assets/*
+
+*.log
+*.rules

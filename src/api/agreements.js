@@ -30,7 +30,7 @@ export const fetchMyAgreements = async (lawyerId) => {
       message: agreement.message,
       created_at: agreement.createdAt,
       updated_at: agreement.updatedAt,
-      files: (agreement.lawyerClientAgreementFiles_on_agreement || []).map((file) => ({
+      files: (agreement.myAgreementFiles || agreement.lawyerClientAgreementFiles_on_agreement || []).map((file) => ({
         id: file.id,
         agreement_id: file.agreementId,
         file_name: file.fileName,

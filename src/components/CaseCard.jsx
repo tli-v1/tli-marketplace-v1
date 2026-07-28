@@ -66,7 +66,7 @@ const CaseCard = ({ data, view, agreementInfo, onOpen }) => {
         />
         <DetailItem
           label="Damages"
-          value={`${formatCurrency(data.medicalDamageUsd)} medical • ${formatCurrency(data.lostWagesUsd)} wages • ${data.daysMissed} days @ ${formatCurrency(data.dailyRateUsd)}/day`}
+          value={`${formatCurrency(data.medicalDamageUsd)} medical • ${formatCurrency(data.lostWagesUsd)} wages • ${data.daysMissed} days @ ${formatCurrency(data.hourlyRateUsd)}/hr`}
         />
         <DetailItem label="Evidence" value={`${docCount} documents`} />
         <DetailItem label="Contact" value={`${data.caseContact.fullName} • ${data.caseContact.method}`} />

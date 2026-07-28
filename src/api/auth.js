@@ -6,8 +6,22 @@ import {
 } from 'firebase/auth'
 import { auth } from '../firebase'
 
-const toAuthError = (error) => ({
-  message: error?.message || 'Authentication failed',
+const INVALID_CREDENTIAL_CODES = new Set([
+  'auth/invalid-credential',
+  'auth/invalid-email',
+  'auth/user-not-found',
+  'auth/wrong-password',
+])
+
+const toAuthError = (error, fallbackMessage = 'Authentication failed') => ({
+  message: error?.message || fallbackMessage,
+  code: error?.code,
+})
+
+const toSignInError = (error) => ({
+  message: INVALID_CREDENTIAL_CODES.has(error?.code)
+    ? 'Invalid username or password'
+    : error?.message || 'Invalid username or password',
   code: error?.code,
 })
 
@@ -70,7 +84,7 @@ export const signInWithPassword = async ({ email, password }) => {
     const credential = await signInWithEmailAndPassword(auth, email, password)
     return { data: { session: await toSession(credential.user), user: toUser(credential.user) }, error: null }
   } catch (error) {
-    return { data: null, error: toAuthError(error) }
+    return { data: null, error: toSignInError(error) }
   }
 }
 

@@ -12,6 +12,7 @@
   "dependencies": {
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "firebase": "^12.12.1",
+    "lucide": "^1.14.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

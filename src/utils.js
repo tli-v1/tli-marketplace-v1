@@ -17,19 +17,31 @@ export const mapCaseRow = (row) => {
   const damagesArray = Array.isArray(row.damages) ? row.damages : row.damages ? [row.damages] : []
   const damages = damagesArray[0] ?? {}
   const normalizedDamages = {
+    injuries: damages.injuries || '',
+    treatment: damages.treatment || '',
     medicalBillsUsd: Number(damages.medical_bills_usd) || 0,
+    propertyDamageUsd: Number(damages.property_damage_usd) || 0,
+    otherExpensesUsd: Number(damages.other_expenses_usd) || 0,
     daysMissed: Number(damages.days_missed) || 0,
-    dailyRateUsd: Number(damages.daily_rate_usd) || 0,
+    hourlyRateUsd: Number(damages.hourly_rate_usd ?? damages.daily_rate_usd) || 0,
     lostWagesUsd: Number(damages.lost_wages_usd) || 0,
+    emotionalImpact: damages.emotional_impact || '',
+    otherDamages: damages.other_damages || '',
+    details: damages.details || '',
   }
-  // lostWagesUsd already accounts for missed days; avoid double-counting by summing only medical + lost wages.
-  const totalValue = normalizedDamages.medicalBillsUsd + normalizedDamages.lostWagesUsd
+  const totalValue =
+    normalizedDamages.medicalBillsUsd +
+    normalizedDamages.propertyDamageUsd +
+    normalizedDamages.otherExpensesUsd +
+    normalizedDamages.lostWagesUsd
 
   const stateCode = (incident.state_code || incident.state || '').toString().toUpperCase()
   const contact = row.case_contact?.[0] || {}
 
   return {
     id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
     title:
       row.title ||
       incidentDescription.split('.').filter(Boolean)[0]?.trim() ||
@@ -49,12 +61,16 @@ export const mapCaseRow = (row) => {
       date: incident.incident_date || new Date().toISOString(),
       city: incident.city || 'Unknown city',
       state: incident.state || 'Unknown',
+      locationDetails: incident.location_details || '',
       description: incident.description || '',
     },
     medicalDamageUsd: normalizedDamages.medicalBillsUsd,
+    propertyDamageUsd: normalizedDamages.propertyDamageUsd,
+    otherExpensesUsd: normalizedDamages.otherExpensesUsd,
     lostWagesUsd: normalizedDamages.lostWagesUsd,
     daysMissed: normalizedDamages.daysMissed,
-    dailyRateUsd: normalizedDamages.dailyRateUsd,
+    hourlyRateUsd: normalizedDamages.hourlyRateUsd,
+    dailyRateUsd: normalizedDamages.hourlyRateUsd,
     damages: normalizedDamages,
     parties: row.parties || [],
     caseContact: {

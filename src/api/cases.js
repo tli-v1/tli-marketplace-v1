@@ -1,10 +1,20 @@
 import { collection, getDocs } from 'firebase/firestore'
-import { getDownloadURL, ref } from 'firebase/storage'
+import { getBlob, ref } from 'firebase/storage'
 import { getLawyerCases } from '@dataconnect/generated'
 import { db, storage } from '../firebase'
 
+const VIEW_FILE_TIMEOUT_MS = 20000
+
+const withTimeout = (promise, ms) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('File load timed out')), ms)
+    }),
+  ])
+
 const normalizeDataConnectCase = (item) => {
-  const incident = item.incidents_on_case?.[0] || {}
+  const incident = (item.lawyerCaseIncidents || item.caseDetailIncidents || item.incidents_on_case)?.[0] || {}
   const damage = item.damage_on_case
   const contact = item.caseContact_on_case
 
@@ -18,6 +28,7 @@ const normalizeDataConnectCase = (item) => {
       id: incident.id,
       case_id: incident.caseId,
       city: incident.city,
+      location_details: incident.locationDetails,
       state_code: incident.stateCode,
       incident_date: incident.incidentDate,
       description: incident.description,
@@ -27,10 +38,17 @@ const normalizeDataConnectCase = (item) => {
       ? [
           {
             case_id: damage.caseId,
+            injuries: damage.injuries,
+            treatment: damage.treatment,
             medical_bills_usd: damage.medicalBillsUsd,
+            property_damage_usd: damage.propertyDamageUsd,
+            other_expenses_usd: damage.otherExpensesUsd,
             days_missed: damage.daysMissed,
-            daily_rate_usd: damage.dailyRateUsd,
+            hourly_rate_usd: damage.hourlyRateUsd,
             lost_wages_usd: damage.lostWagesUsd,
+            emotional_impact: damage.emotionalImpact,
+            other_damages: damage.otherDamages,
+            details: damage.details,
           },
         ]
       : [],
@@ -56,7 +74,7 @@ const normalizeDataConnectCase = (item) => {
       claim_number: party.claimNumber,
       created_at: party.createdAt,
     })),
-    documents: (item.documents_on_case || []).map((doc) => ({
+    documents: (item.lawyerCaseDocuments || item.caseDetailDocuments || item.documents_on_case || []).map((doc) => ({
       id: doc.id,
       case_id: doc.caseId,
       kind: doc.kind,
@@ -66,21 +84,39 @@ const normalizeDataConnectCase = (item) => {
       uploaded_at: doc.uploadedAt,
       notes: doc.notes,
     })),
+    agreements: (item.lawyerCaseAgreements || item.caseDetailAgreements || item.lawyerClientAgreements_on_case || []).map(
+      (agreement) => ({
+        id: agreement.id,
+        case_id: agreement.caseId,
+        lawyer_id: agreement.lawyerId,
+        message: agreement.message,
+        created_at: agreement.createdAt,
+        updated_at: agreement.updatedAt,
+        files: (agreement.lawyerAgreementFiles || agreement.caseDetailAgreementFiles || agreement.lawyerClientAgreementFiles_on_agreement || []).map((file) => ({
+          id: file.id,
+          agreement_id: file.agreementId,
+          file_name: file.fileName,
+          storage_path: file.storagePath,
+          public_url: file.publicUrl,
+          content_type: file.contentType,
+          size: file.fileSize,
+          created_at: file.createdAt,
+        })),
+      }),
+    ),
   }
 }
 
 export const getCaseDocSignedUrl = async (doc) => {
-  const existingUrl = doc?.signed_url || doc?.signedUrl || doc?.public_url || doc?.file_url || doc?.url
-  if (existingUrl) return existingUrl
-
   const path = doc?.storage_path || doc?.path || doc?.fullPath
-  if (!path) return null
+  if (!path) return { url: null, error: 'Missing storage path.' }
 
   try {
-    return await getDownloadURL(ref(storage, path))
+    const blob = await withTimeout(getBlob(ref(storage, path)), VIEW_FILE_TIMEOUT_MS)
+    return { url: URL.createObjectURL(blob), error: null }
   } catch (error) {
     console.error('Get case document URL error', error)
-    return null
+    return { url: null, error: error?.message || 'Unable to load file.' }
   }
 }
 

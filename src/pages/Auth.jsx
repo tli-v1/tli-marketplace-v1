@@ -24,7 +24,7 @@ const Auth = () => {
     } else {
       const { error } = await signInWithPassword({ email, password })
       if (error) {
-        setMessage(`Sign in failed: ${error.message}`)
+        setMessage(error.message)
       } else {
         setMessage('Signed in.')
       }

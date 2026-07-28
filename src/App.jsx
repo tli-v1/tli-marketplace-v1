@@ -10,13 +10,20 @@ import {
 } from './api/auth'
 import CaseCard from './components/CaseCard'
 import CaseDetail from './components/CaseDetail'
+import CaseTable from './components/CaseTable'
 import StateFilter from './components/StateFilter'
+import LawFirmApplicationPage from './pages/LawFirmApplicationPage'
 import tliLogo from './assets/tli_logo.png'
 import { mapCaseRow, parseValueCeiling } from './utils'
 import { fetchCases } from './api/cases'
 import { fetchStateCodes } from './api/stateCodes'
 import { fetchMyAgreements, submitAgreement } from './api/agreements'
-import { fetchUserProfile } from './api/users'
+import {
+  defaultNotificationPreferences,
+  fetchNotificationPreferences,
+  fetchUserProfile,
+  saveNotificationPreferences,
+} from './api/users'
 import './App.css'
 
 const fallbackStates = ['Missouri', 'Kansas', 'Nebraska', 'Iowa']
@@ -31,6 +38,13 @@ const practiceAreas = [
   'Workplace Safety',
 ]
 
+const toTime = (value) => {
+  if (!value) return 0
+  const date = value.toDate ? value.toDate() : new Date(value)
+  const time = date.getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
 const Checkbox = ({ label, checked, onChange }) => (
   <label className="checkbox">
     <input type="checkbox" checked={checked} onChange={onChange} />
@@ -39,11 +53,13 @@ const Checkbox = ({ label, checked, onChange }) => (
 )
 
 function App() {
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname)
   const [search, setSearch] = useState('')
   const [stateFilter, setStateFilter] = useState(new Set())
   const [practiceFilter, setPracticeFilter] = useState(new Set())
-  const [sort, setSort] = useState('urgency')
-  const [view, setView] = useState('grid')
+  const [sort, setSort] = useState('created')
+  const [view, setView] = useState('table')
+  const [tablePage, setTablePage] = useState(1)
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -58,7 +74,7 @@ function App() {
   const [signInPassword, setSignInPassword] = useState('')
   const [signInMessage, setSignInMessage] = useState('')
   const [signInLoading, setSignInLoading] = useState(false)
-  const [userIdentity, setUserIdentity] = useState({ displayName: '', email: '' })
+  const [userIdentity, setUserIdentity] = useState({ displayName: '', email: '', phone: '' })
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [roleChecked, setRoleChecked] = useState(false)
@@ -66,7 +82,20 @@ function App() {
   const [agreementState, setAgreementState] = useState({})
   const [myAgreements, setMyAgreements] = useState({})
   const [selectedCaseId, setSelectedCaseId] = useState(null)
+  const [page, setPage] = useState('marketplace')
+  const [notificationPrefs, setNotificationPrefs] = useState(defaultNotificationPreferences)
+  const [notificationDraft, setNotificationDraft] = useState(defaultNotificationPreferences)
+  const [notificationLoading, setNotificationLoading] = useState(false)
+  const [notificationSaving, setNotificationSaving] = useState(false)
+  const [notificationMessage, setNotificationMessage] = useState('')
   const showAuth = import.meta.env.VITE_SHOW_SIGN_IN === 'true'
+  const tablePageSize = 10
+
+  useEffect(() => {
+    const handlePopState = () => setCurrentPath(window.location.pathname)
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   useEffect(() => {
     if (!session?.user?.id) return
@@ -180,7 +209,7 @@ function App() {
   useEffect(() => {
     const fetchUserIdentity = async () => {
       if (!session) {
-        setUserIdentity({ displayName: '', email: '' })
+        setUserIdentity({ displayName: '', email: '', phone: '' })
         return
       }
       const { data: userData, error: userError } = await getUser()
@@ -195,7 +224,7 @@ function App() {
         displayName = profileData.full_name
       }
 
-      setUserIdentity({ displayName, email })
+      setUserIdentity({ displayName, email, phone: profileData?.phone || '' })
     }
 
     fetchUserIdentity()
@@ -224,6 +253,31 @@ function App() {
       setMyAgreements(map)
     }
     fetchMyAgreementsForUser()
+  }, [session])
+
+  useEffect(() => {
+    const loadNotificationPreferences = async () => {
+      if (!session?.user?.id) {
+        setNotificationPrefs(defaultNotificationPreferences)
+        setNotificationDraft(defaultNotificationPreferences)
+        setNotificationMessage('')
+        return
+      }
+
+      setNotificationLoading(true)
+      const { data, error } = await fetchNotificationPreferences(session.user.id)
+      setNotificationLoading(false)
+      if (error) {
+        console.error('Fetch notification preferences error', error)
+        setNotificationMessage(`Unable to load notification settings: ${error.message}`)
+        return
+      }
+      setNotificationPrefs(data)
+      setNotificationDraft(data)
+      setNotificationMessage('')
+    }
+
+    loadNotificationPreferences()
   }, [session])
 
   useEffect(() => {
@@ -271,16 +325,32 @@ function App() {
     })
 
     const sorted = [...filteredCases]
-    if (sort === 'urgency') {
+    if (sort === 'created') {
+      sorted.sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt))
+    } else if (sort === 'urgency') {
       sorted.sort((a, b) => a.urgencyDays - b.urgencyDays)
     } else if (sort === 'value-high') {
       sorted.sort((a, b) => parseValueCeiling(b.valueRange) - parseValueCeiling(a.valueRange))
     } else if (sort === 'recent') {
-      sorted.sort((a, b) => new Date(b.incident.date) - new Date(a.incident.date))
+      sorted.sort((a, b) => toTime(b.incident.date) - toTime(a.incident.date))
     }
 
     return sorted.map((item) => ({ ...item, displayState: resolveStateLabel(item) }))
   }, [search, sort, stateFilter, practiceFilter, cases, resolveStateLabel])
+
+  useEffect(() => {
+    setTablePage(1)
+  }, [search, sort, stateFilter, practiceFilter, view])
+
+  const tableCases = useMemo(() => {
+    const start = (tablePage - 1) * tablePageSize
+    return filtered.slice(start, start + tablePageSize)
+  }, [filtered, tablePage])
+
+  const handleTablePageChange = (nextPage) => {
+    const maxPage = Math.max(Math.ceil(filtered.length / tablePageSize), 1)
+    setTablePage(Math.min(Math.max(nextPage, 1), maxPage))
+  }
 
   const handleSubmitAgreement = async ({ caseId, file, message }) => {
     if (!session?.user?.id) {
@@ -341,7 +411,7 @@ function App() {
     setStateFilter(new Set())
     setPracticeFilter(new Set())
     setSearch('')
-    setSort('urgency')
+    setSort('created')
   }
 
   const handleSignup = async (event) => {
@@ -430,7 +500,7 @@ function App() {
     setSignInLoading(false)
 
     if (signInError) {
-      setSignInMessage(`Sign in failed: ${signInError.message}`)
+      setSignInMessage(signInError.message)
       return
     }
 
@@ -455,6 +525,42 @@ function App() {
       localStorage.removeItem(`role-cache:${session.user.id}`)
     }
     setSignOutLoading(false)
+  }
+
+  const handleNotificationToggle = (key) => {
+    setNotificationDraft((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const handleNotificationCadence = (value) => {
+    setNotificationDraft((prev) => ({ ...prev, alertCadence: value }))
+  }
+
+  const handleSaveNotificationPreferences = async (event) => {
+    event.preventDefault()
+    if (!session?.user?.id) return
+
+    setNotificationMessage('')
+    setNotificationSaving(true)
+    const { data, error } = await saveNotificationPreferences(session.user.id, notificationDraft)
+    setNotificationSaving(false)
+    if (error) {
+      setNotificationMessage(`Save failed: ${error.message}`)
+      return
+    }
+
+    setNotificationPrefs(data)
+    setNotificationDraft(data)
+    setNotificationMessage('Notification settings saved.')
+  }
+
+  if (currentPath === '/apply') {
+    return (
+      <LawFirmApplicationPage
+        stateCodes={stateCodes}
+        fallbackStates={fallbackStates}
+        practiceAreas={practiceAreas}
+      />
+    )
   }
 
   if (!authChecked) {
@@ -507,6 +613,12 @@ function App() {
             <small className="auth-hint">Access limited to authorized lawyers.</small>
           </form>
           {signInMessage && <div className="auth-message">{signInMessage}</div>}
+          <div className="apply-cta">
+            <span>Don&apos;t have access, apply now</span>
+            <a className="secondary-btn apply-link" href="/apply">
+              Apply
+            </a>
+          </div>
         </div>
 
         {showAuth && (
@@ -566,15 +678,31 @@ function App() {
           </div>
           <div className="private-pill">Private lawyer-specific view</div>
         </div>
-        <div className="search">
-          <SearchIcon />
-          <input
-            type="text"
-            placeholder="Search by case or fact pattern…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        {page === 'marketplace' ? (
+          <div className="search">
+            <SearchIcon />
+            <input
+              type="text"
+              placeholder="Search by case or fact pattern…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        ) : (
+          <div className="topbar-title">
+            <span>Profile settings</span>
+            <small>Notification preferences for new marketplace cases</small>
+          </div>
+        )}
+        <button
+          className={`icon-btn ${page === 'profile' ? 'active' : ''}`}
+          type="button"
+          onClick={() => setPage(page === 'profile' ? 'marketplace' : 'profile')}
+          aria-label={page === 'profile' ? 'Back to marketplace' : 'Open profile settings'}
+        >
+          <SettingsIcon />
+          {page === 'profile' ? 'Marketplace' : 'Settings'}
+        </button>
         <button className="icon-btn" type="button" aria-label="Saved cases">
           <BookmarkIcon />
           Saved
@@ -584,101 +712,202 @@ function App() {
         </button>
       </header>
 
-      <main className="page">
-        <aside className="sidebar">
-          <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">Filters</span>
-              <button className="link" onClick={resetFilters}>
-                Reset
-              </button>
+      {page === 'profile' ? (
+        <main className="profile-page">
+          <section className="profile-card">
+            <div className="profile-head">
+              <div>
+                <h1>Profile</h1>
+                <p>{userIdentity.email || session.user.email}</p>
+              </div>
+              <div className="profile-badge">Lawyer</div>
             </div>
 
-            <div className="filter-group">
-              <div className="group-title">State (license filter)</div>
-              <StateFilter
-                stateCodes={stateCodes}
-                fallbackStates={fallbackStates}
-                value={stateFilter}
-                onChange={(next) => setStateFilter(new Set(next))}
-              />
-            </div>
+            <form className="profile-form" onSubmit={handleSaveNotificationPreferences}>
+              <div className="settings-section">
+                <div>
+                  <h2>New case notifications</h2>
+                  <p>Choose where marketplace alerts should be sent when new cases are available.</p>
+                </div>
+                <div className="settings-grid">
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={notificationDraft.emailNewCases}
+                      onChange={() => handleNotificationToggle('emailNewCases')}
+                      disabled={notificationLoading || notificationSaving}
+                    />
+                    <span>
+                      <strong>Email alerts</strong>
+                      <small>{userIdentity.email || session.user.email || 'Account email'}</small>
+                    </span>
+                  </label>
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={notificationDraft.smsNewCases}
+                      onChange={() => handleNotificationToggle('smsNewCases')}
+                      disabled={notificationLoading || notificationSaving}
+                    />
+                    <span>
+                      <strong>SMS alerts</strong>
+                      <small>{userIdentity.phone || 'Uses phone on your user profile when configured'}</small>
+                    </span>
+                  </label>
+                </div>
+              </div>
 
-            <div className="filter-group">
-              <div className="group-title">Practice area</div>
-              <div className="stack">
-                {practiceAreas.map((area) => (
-                  <Checkbox
-                    key={area}
-                    label={area}
-                    checked={practiceFilter.has(area)}
-                    onChange={() => togglePractice(area)}
-                  />
-                ))}
+              <div className="settings-section">
+                <div>
+                  <h2>Alert timeframe</h2>
+                  <p>Set how often new-case alerts should be grouped.</p>
+                </div>
+                <div className="segmented-control" role="radiogroup" aria-label="Alert timeframe">
+                  <button
+                    type="button"
+                    className={notificationDraft.alertCadence === 'daily' ? 'active' : ''}
+                    onClick={() => handleNotificationCadence('daily')}
+                    disabled={notificationLoading || notificationSaving}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    type="button"
+                    className={notificationDraft.alertCadence === 'weekly' ? 'active' : ''}
+                    onClick={() => handleNotificationCadence('weekly')}
+                    disabled={notificationLoading || notificationSaving}
+                  >
+                    Weekly
+                  </button>
+                </div>
+              </div>
+
+              <div className="profile-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => setNotificationDraft(notificationPrefs)}
+                  disabled={notificationLoading || notificationSaving}
+                >
+                  Reset
+                </button>
+                <button className="primary-btn" type="submit" disabled={notificationLoading || notificationSaving}>
+                  {notificationSaving ? 'Saving…' : 'Save settings'}
+                </button>
+              </div>
+              {notificationMessage && <div className="auth-message">{notificationMessage}</div>}
+            </form>
+          </section>
+        </main>
+      ) : (
+        <main className="page">
+          <aside className="sidebar">
+            <div className="panel">
+              <div className="panel-head">
+                <span className="panel-title">Filters</span>
+                <button className="link" onClick={resetFilters}>
+                  Reset
+                </button>
+              </div>
+
+              <div className="filter-group">
+                <div className="group-title">State (license filter)</div>
+                <StateFilter
+                  stateCodes={stateCodes}
+                  fallbackStates={fallbackStates}
+                  value={stateFilter}
+                  onChange={(next) => setStateFilter(new Set(next))}
+                />
+              </div>
+
+              <div className="filter-group">
+                <div className="group-title">Practice area</div>
+                <div className="stack">
+                  {practiceAreas.map((area) => (
+                    <Checkbox
+                      key={area}
+                      label={area}
+                      checked={practiceFilter.has(area)}
+                      onChange={() => togglePractice(area)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="filter-group">
+                <div className="group-title">Sort by</div>
+                <div className="select">
+                  <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                    <option value="created">Date created</option>
+                    <option value="urgency">SOL urgency</option>
+                    <option value="recent">Most recent incident</option>
+                    <option value="value-high">Value high to low</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="filter-group">
-              <div className="group-title">Sort by</div>
-              <div className="select">
-                <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                  <option value="urgency">SOL urgency</option>
-                  <option value="recent">Most recent incident</option>
-                  <option value="value-high">Value high to low</option>
-                </select>
+            <div className="panel notice">
+              <div className="notice-title">Compliance First</div>
+              <p>
+                Viewing gated to state licensure. Contact requires user consent and disclosures per Rules 7.2/7.3; platform logs
+                all outreach.
+              </p>
+            </div>
+          </aside>
+
+          <section className="content">
+            <div className="content-head">
+              {!loading && (
+                <div className="results">
+                  <span className="count">{filtered.length}</span>
+                  <span className="label">results</span>
+                </div>
+              )}
+              <div className="view-toggle">
+                <button className={view === 'table' ? 'active' : ''} onClick={() => setView('table')}>
+                  Table
+                </button>
+                <button className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}>
+                  Grid
+                </button>
               </div>
             </div>
-          </div>
 
-          <div className="panel notice">
-            <div className="notice-title">Compliance First</div>
-            <p>
-              Viewing gated to state licensure. Contact requires user consent and disclosures per Rules 7.2/7.3; platform logs
-              all outreach.
-            </p>
-          </div>
-        </aside>
-
-        <section className="content">
-          <div className="content-head">
-            {!loading && (
-              <div className="results">
-                <span className="count">{filtered.length}</span>
-                <span className="label">results</span>
+            {loading && <div className="panel">Loading cases…</div>}
+            {error && (
+              <div className="panel notice">
+                <div className="notice-title">Error loading cases</div>
+                <p>{error}</p>
               </div>
             )}
-            <div className="view-toggle">
-              <button className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}>
-                Grid
-              </button>
-              <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>
-                List
-              </button>
-            </div>
-          </div>
-
-          {loading && <div className="panel">Loading cases…</div>}
-          {error && (
-            <div className="panel notice">
-              <div className="notice-title">Error loading cases</div>
-              <p>{error}</p>
-            </div>
-          )}
-          {!loading && !error && (
-            <div className={`cases ${view}`}>
-              {filtered.map((item) => (
-                <CaseCard
-                  key={item.id}
-                  data={item}
-                  view={view}
-                  agreementInfo={myAgreements[item.id]}
+            {!loading && !error && (
+              view === 'table' ? (
+                <CaseTable
+                  cases={tableCases}
+                  page={tablePage}
+                  pageSize={tablePageSize}
+                  totalCount={filtered.length}
+                  onPageChange={handleTablePageChange}
                   onOpen={(id) => setSelectedCaseId(id)}
                 />
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
+              ) : (
+                <div className={`cases ${view}`}>
+                  {filtered.map((item) => (
+                    <CaseCard
+                      key={item.id}
+                      data={item}
+                      view={view}
+                      agreementInfo={myAgreements[item.id]}
+                      onOpen={(id) => setSelectedCaseId(id)}
+                    />
+                  ))}
+                </div>
+              )
+            )}
+          </section>
+        </main>
+      )}
 
       {selectedCase && (
         <CaseDetail
@@ -707,6 +936,15 @@ const BookmarkIcon = () => (
     <path
       fill="currentColor"
       d="M6 3h12v18l-6-3-6 3V3Zm2 2v11.56l4-2 4 2V5H8Z"
+    />
+  </svg>
+)
+
+const SettingsIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="currentColor"
+      d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm7.43 2.98c.04-.32.07-.65.07-.98s-.03-.66-.07-.98l2.08-1.62-2-3.46-2.45.98a7.34 7.34 0 0 0-1.7-.99L15 3.31h-4l-.36 2.62c-.6.24-1.17.57-1.7.99l-2.45-.98-2 3.46 2.08 1.62c-.04.32-.07.65-.07.98s.03.66.07.98L4.49 14.6l2 3.46 2.45-.98c.53.42 1.1.75 1.7.99L11 20.69h4l.36-2.62c.6-.24 1.17-.57 1.7-.99l2.45.98 2-3.46-2.08-1.62Zm-1.96-1.46.12.5-.12.5-.19.76 1.62 1.26-.34.58-1.91-.76-.61.49c-.38.3-.8.55-1.24.73l-.73.3-.28 2.04h-.68l-.28-2.04-.73-.3c-.44-.18-.86-.43-1.24-.73l-.61-.49-1.91.76-.34-.58 1.62-1.26-.19-.76a4.1 4.1 0 0 1-.12-.5c0-.16.04-.34.12-.5l.19-.76-1.62-1.26.34-.58 1.91.76.61-.49c.38-.3.8-.55 1.24-.73l.73-.3.28-2.04h.68l.28 2.04.73.3c.44.18.86.43 1.24.73l.61.49 1.91-.76.34.58-1.62 1.26.19.76Z"
     />
   </svg>
 )
