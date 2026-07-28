@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import tliLogo from '../assets/tli_logo.png'
 import { submitLawFirmApplication } from '../api/applications'
 import ApplySection from '../components/ApplySection'
 import CheckboxGroup from '../components/CheckboxGroup'
 import MultiSelectDropdown from '../components/MultiSelectDropdown'
 import TextInput from '../components/TextInput'
+
+const tliLogo = '/tli_logo.png'
+const otherPracticeArea = 'Other'
 
 const casePreferenceOptions = [
   'High-value personal injury',
@@ -25,6 +27,7 @@ const initialApplication = {
   website: '',
   statesServed: [],
   practiceAreas: [],
+  otherPracticeArea: '',
   numberOfAttorneys: '',
   preferredCaseTypes: [],
   monthlyCaseCapacity: '',
@@ -46,6 +49,8 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
   const stateOptions = stateCodes.length
     ? stateCodes.map((item) => ({ value: item.name || item.code, label: `${item.name} (${item.code})` }))
     : fallbackStates.map((state) => ({ value: state, label: state }))
+  const practiceAreaOptions = [...practiceAreas, otherPracticeArea].map((area) => ({ value: area, label: area }))
+  const hasOtherPracticeArea = form.practiceAreas.includes(otherPracticeArea)
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -68,10 +73,19 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
       return
     }
 
+    if (hasOtherPracticeArea && !form.otherPracticeArea.trim()) {
+      setMessage('Please enter the other practice area before submitting.')
+      return
+    }
+
     if (form.attorneysGoodStanding === 'no' && !form.goodStandingExplanation.trim()) {
       setMessage('Please explain the good standing issue before submitting.')
       return
     }
+
+    const submittedPracticeAreas = form.practiceAreas.map((area) => (
+      area === otherPracticeArea ? `Other: ${form.otherPracticeArea.trim()}` : area
+    ))
 
     setSubmitting(true)
     const { error } = await submitLawFirmApplication({
@@ -81,7 +95,7 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
       phone: form.phone.trim(),
       website: form.website.trim(),
       states_served: form.statesServed,
-      practice_areas: form.practiceAreas,
+      practice_areas: submittedPracticeAreas,
       number_of_attorneys: Number(form.numberOfAttorneys),
       preferred_case_types: form.preferredCaseTypes,
       monthly_case_capacity: Number(form.monthlyCaseCapacity),
@@ -123,7 +137,6 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
             <h1>Law firm marketplace application</h1>
             <p>Apply for access to review and receive marketplace case opportunities.</p>
           </div>
-          <span className="profile-badge">Application</span>
         </section>
 
         <form className="apply-form" onSubmit={handleSubmit}>
@@ -145,10 +158,22 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
             />
             <CheckboxGroup
               label="Practice Areas"
-              options={practiceAreas.map((area) => ({ value: area, label: area }))}
+              options={practiceAreaOptions}
               value={form.practiceAreas}
               onChange={(value) => toggleArrayValue('practiceAreas', value)}
             />
+            {hasOtherPracticeArea && (
+              <label className="form-field full other-practice-field">
+                <span>Other practice area</span>
+                <textarea
+                  rows={2}
+                  value={form.otherPracticeArea}
+                  onChange={(event) => updateField('otherPracticeArea', event.target.value)}
+                  placeholder="Enter additional practice area"
+                  required
+                />
+              </label>
+            )}
             <TextInput
               label="Number of attorneys"
               type="number"

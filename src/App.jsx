@@ -13,7 +13,6 @@ import CaseDetail from './components/CaseDetail'
 import CaseTable from './components/CaseTable'
 import StateFilter from './components/StateFilter'
 import LawFirmApplicationPage from './pages/LawFirmApplicationPage'
-import tliLogo from './assets/tli_logo.png'
 import { mapCaseRow, parseValueCeiling } from './utils'
 import { fetchCases } from './api/cases'
 import { fetchStateCodes } from './api/stateCodes'
@@ -26,6 +25,7 @@ import {
 } from './api/users'
 import './App.css'
 
+const tliLogo = '/tli_logo.png'
 const fallbackStates = ['Missouri', 'Kansas', 'Nebraska', 'Iowa']
 const practiceAreas = [
   'Personal Injury',
