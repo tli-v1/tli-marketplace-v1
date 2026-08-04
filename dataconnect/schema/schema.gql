@@ -4,6 +4,7 @@ type Incident @table {
   description: String!
   incidentDate: Date!
   city: String
+  locationDetails: String
   createdAt: Timestamp!
   stateCode: String
   state: StateCode @ref(fields: "stateCode")
@@ -20,6 +21,16 @@ type UserProfile @table(key: ["userId"]) {
   role: String!
   fullName: String
   phone: String
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type LawyerUserProfile @table(key: ["lawyerId"]) {
+  lawyerId: String! @default(expr: "auth.uid")
+  lawyer: UserProfile! @ref(fields: "lawyerId")
+  emailNewCases: Boolean!
+  smsNewCases: Boolean!
+  alertTimeframe: AlertTimeframe!
   createdAt: Timestamp!
   updatedAt: Timestamp!
 }
@@ -51,10 +62,17 @@ type Party @table {
 type Damage @table(key: ["caseId"]) {
   caseId: UUID!
   case: Case! @ref(fields: "caseId")
+  injuries: String
+  treatment: String
   medicalBillsUsd: Float
+  propertyDamageUsd: Float
+  otherExpensesUsd: Float
   daysMissed: Int
-  dailyRateUsd: Float
+  hourlyRateUsd: Float
   lostWagesUsd: Float
+  emotionalImpact: String
+  otherDamages: String
+  details: String
 }
 
 type CaseContact @table(key: ["caseId"]) {
@@ -102,6 +120,53 @@ type LawyerClientAgreementFile @table {
   createdAt: Timestamp!
 }
 
+type LawFirmApplication @table {
+  id: UUID! @default(expr: "uuidV4()")
+  lawFirmName: String!
+  primaryContactName: String!
+  email: String!
+  phone: String!
+  website: String
+  numberOfAttorneys: Int!
+  monthlyCaseCapacity: Int!
+  googleBusinessProfileUrl: String!
+  googleRating: Float!
+  approximateClientsServed: Int
+  clientServiceYears: Float
+  marketplaceFit: String!
+  attorneysGoodStanding: GoodStandingAnswer!
+  goodStandingExplanation: String
+  status: LawFirmApplicationStatus!
+  reviewNotes: String
+  reviewedBy: String
+  reviewer: UserProfile @ref(fields: "reviewedBy")
+  reviewedAt: Timestamp
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type LawFirmApplicationState @table {
+  id: UUID! @default(expr: "uuidV4()")
+  applicationId: UUID!
+  application: LawFirmApplication! @ref(fields: "applicationId")
+  stateCode: String!
+  state: StateCode! @ref(fields: "stateCode")
+}
+
+type LawFirmApplicationPracticeArea @table {
+  id: UUID! @default(expr: "uuidV4()")
+  applicationId: UUID!
+  application: LawFirmApplication! @ref(fields: "applicationId")
+  name: String!
+}
+
+type LawFirmApplicationCasePreference @table {
+  id: UUID! @default(expr: "uuidV4()")
+  applicationId: UUID!
+  application: LawFirmApplication! @ref(fields: "applicationId")
+  name: String!
+}
+
 enum CaseStatus {
   OPEN
   CLOSED
@@ -121,9 +186,26 @@ enum ContactMethod {
   TEXT
 }
 
+enum AlertTimeframe {
+  DAILY
+  WEEKLY
+}
+
 enum DocKind {
   MEDICAL_BILL
   POLICE_REPORT
   PHOTO
   OTHER
+}
+
+enum LawFirmApplicationStatus {
+  NEW
+  REVIEWING
+  APPROVED
+  REJECTED
+}
+
+enum GoodStandingAnswer {
+  YES
+  NO
 }

@@ -7,11 +7,19 @@ import TextInput from '../components/TextInput'
 
 const tliLogo = '/tli_logo.png'
 const otherPracticeArea = 'Other'
+const fallbackStateOptions = [
+  { value: 'MO', label: 'Missouri (MO)' },
+  { value: 'KS', label: 'Kansas (KS)' },
+  { value: 'NE', label: 'Nebraska (NE)' },
+  { value: 'IA', label: 'Iowa (IA)' },
+]
 
 const casePreferenceOptions = [
-  'High-value personal injury',
+  'Can evaluate smaller personal injury cases',
+  'Volume firm for routine injury claims',
   'Auto collisions',
   'Premises liability',
+  'Trucking / commercial vehicle claims',
   'Medical malpractice',
   'Employment disputes',
   'Products liability',
@@ -33,7 +41,8 @@ const initialApplication = {
   monthlyCaseCapacity: '',
   googleBusinessProfileUrl: '',
   googleRating: '',
-  largestSettlementOrVerdict: '',
+  approximateClientsServed: '',
+  clientServiceYears: '',
   marketplaceFit: '',
   attorneysGoodStanding: '',
   goodStandingExplanation: '',
@@ -47,8 +56,8 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
   const [submitted, setSubmitted] = useState(false)
 
   const stateOptions = stateCodes.length
-    ? stateCodes.map((item) => ({ value: item.name || item.code, label: `${item.name} (${item.code})` }))
-    : fallbackStates.map((state) => ({ value: state, label: state }))
+    ? stateCodes.map((item) => ({ value: item.code, label: `${item.name} (${item.code})` }))
+    : fallbackStateOptions.filter((option) => fallbackStates.some((state) => option.label.startsWith(state)))
   const practiceAreaOptions = [...practiceAreas, otherPracticeArea].map((area) => ({ value: area, label: area }))
   const hasOtherPracticeArea = form.practiceAreas.includes(otherPracticeArea)
 
@@ -78,6 +87,11 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
       return
     }
 
+    if (!form.googleBusinessProfileUrl.trim() || !form.googleRating) {
+      setMessage('Please provide the Google Business Profile URL and approximate Google rating.')
+      return
+    }
+
     if (form.attorneysGoodStanding === 'no' && !form.goodStandingExplanation.trim()) {
       setMessage('Please explain the good standing issue before submitting.')
       return
@@ -101,7 +115,8 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
       monthly_case_capacity: Number(form.monthlyCaseCapacity),
       google_business_profile_url: form.googleBusinessProfileUrl.trim(),
       google_rating: form.googleRating ? Number(form.googleRating) : null,
-      largest_settlement_or_verdict: form.largestSettlementOrVerdict.trim(),
+      approximate_clients_served: form.approximateClientsServed ? Number(form.approximateClientsServed) : null,
+      client_service_years: form.clientServiceYears ? Number(form.clientServiceYears) : null,
       marketplace_fit: form.marketplaceFit.trim(),
       attorneys_good_standing: form.attorneysGoodStanding,
       good_standing_explanation: form.goodStandingExplanation.trim(),
@@ -207,7 +222,8 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
               type="url"
               value={form.googleBusinessProfileUrl}
               onChange={(value) => updateField('googleBusinessProfileUrl', value)}
-              placeholder="Optional"
+              placeholder="https://g.page/your-firm"
+              required
             />
             <TextInput
               label="Approximate Google rating"
@@ -217,12 +233,24 @@ const LawFirmApplicationPage = ({ stateCodes, fallbackStates, practiceAreas }) =
               step="0.1"
               value={form.googleRating}
               onChange={(value) => updateField('googleRating', value)}
+              placeholder="4.8"
+              required
+            />
+            <TextInput
+              label="Approximate total clients served"
+              type="number"
+              min="0"
+              value={form.approximateClientsServed}
+              onChange={(value) => updateField('approximateClientsServed', value)}
               placeholder="Optional"
             />
             <TextInput
-              label="Largest settlement or verdict"
-              value={form.largestSettlementOrVerdict}
-              onChange={(value) => updateField('largestSettlementOrVerdict', value)}
+              label="Approximate years serving clients"
+              type="number"
+              min="0"
+              step="0.5"
+              value={form.clientServiceYears}
+              onChange={(value) => updateField('clientServiceYears', value)}
               placeholder="Optional"
             />
             <label className="form-field full">

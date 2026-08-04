@@ -8,10 +8,11 @@ query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
     consentAt
     createdAt
     updatedAt
-    incidents_on_case(limit: 1) {
+    lawyerCaseIncidents: incidents_on_case(limit: 1) {
       id
       caseId
       city
+      locationDetails
       stateCode
       incidentDate
       description
@@ -19,10 +20,17 @@ query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
     }
     damage_on_case {
       caseId
+      injuries
+      treatment
       medicalBillsUsd
+      propertyDamageUsd
+      otherExpensesUsd
       daysMissed
-      dailyRateUsd
+      hourlyRateUsd
       lostWagesUsd
+      emotionalImpact
+      otherDamages
+      details
     }
     caseContact_on_case {
       caseId
@@ -41,7 +49,7 @@ query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
       claimNumber
       createdAt
     }
-    documents_on_case(orderBy: [{ uploadedAt: DESC }]) {
+    lawyerCaseDocuments: documents_on_case(orderBy: [{ uploadedAt: DESC }]) {
       id
       caseId
       kind
@@ -51,14 +59,14 @@ query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
       uploadedAt
       notes
     }
-    lawyerClientAgreements_on_case(orderBy: [{ createdAt: DESC }]) {
+    lawyerCaseAgreements: lawyerClientAgreements_on_case(orderBy: [{ createdAt: DESC }]) {
       id
       caseId
       lawyerId
       message
       createdAt
       updatedAt
-      lawyerClientAgreementFiles_on_agreement {
+      lawyerAgreementFiles: lawyerClientAgreementFiles_on_agreement(orderBy: [{ createdAt: ASC }]) {
         id
         agreementId
         fileName
@@ -80,14 +88,14 @@ query GetUserCases @auth(level: USER) {
     id
     status
     createdAt
-    incidents_on_case(limit: 1) {
+    caseListIncidents: incidents_on_case(limit: 1) {
       city
       stateCode
     }
-    documents_on_case {
+    caseListDocuments: documents_on_case {
       id
     }
-    lawyerClientAgreements_on_case {
+    caseListAgreements: lawyerClientAgreements_on_case {
       id
     }
   }
@@ -103,10 +111,11 @@ query GetCaseDetails($caseId: UUID!) @auth(level: USER) {
     consentAt
     createdAt
     updatedAt
-    incidents_on_case(limit: 1) {
+    caseDetailIncidents: incidents_on_case(limit: 1) {
       id
       caseId
       city
+      locationDetails
       stateCode
       incidentDate
       description
@@ -114,10 +123,17 @@ query GetCaseDetails($caseId: UUID!) @auth(level: USER) {
     }
     damage_on_case {
       caseId
+      injuries
+      treatment
       medicalBillsUsd
+      propertyDamageUsd
+      otherExpensesUsd
       daysMissed
-      dailyRateUsd
+      hourlyRateUsd
       lostWagesUsd
+      emotionalImpact
+      otherDamages
+      details
     }
     caseContact_on_case {
       caseId
@@ -136,7 +152,7 @@ query GetCaseDetails($caseId: UUID!) @auth(level: USER) {
       claimNumber
       createdAt
     }
-    documents_on_case(orderBy: [{ uploadedAt: DESC }]) {
+    caseDetailDocuments: documents_on_case(orderBy: [{ uploadedAt: DESC }]) {
       id
       caseId
       kind
@@ -146,14 +162,14 @@ query GetCaseDetails($caseId: UUID!) @auth(level: USER) {
       uploadedAt
       notes
     }
-    lawyerClientAgreements_on_case(orderBy: [{ createdAt: DESC }]) {
+    caseDetailAgreements: lawyerClientAgreements_on_case(orderBy: [{ createdAt: DESC }]) {
       id
       caseId
       lawyerId
       message
       createdAt
       updatedAt
-      lawyerClientAgreementFiles_on_agreement {
+      caseDetailAgreementFiles: lawyerClientAgreementFiles_on_agreement(orderBy: [{ createdAt: ASC }]) {
         id
         agreementId
         fileName
@@ -176,6 +192,17 @@ query GetUserProfile @auth(level: USER) {
   }
 }
 
+query GetLawyerUserProfile @auth(expr: "auth.token.role == 'lawyer'") {
+  lawyerUserProfile(key: { lawyerId_expr: "auth.uid" }) {
+    lawyerId
+    emailNewCases
+    smsNewCases
+    alertTimeframe
+    createdAt
+    updatedAt
+  }
+}
+
 query GetStateCodes @auth(level: PUBLIC, insecureReason: "State codes are public reference data") {
   stateCodes(where: { active: { eq: true } }, orderBy: [{ code: ASC }]) {
     code
@@ -194,7 +221,7 @@ query GetMyAgreements @auth(level: USER) {
     message
     createdAt
     updatedAt
-    lawyerClientAgreementFiles_on_agreement(orderBy: [{ createdAt: ASC }]) {
+    myAgreementFiles: lawyerClientAgreementFiles_on_agreement(orderBy: [{ createdAt: ASC }]) {
       id
       agreementId
       fileName

@@ -377,7 +377,7 @@
   top: 0;
   z-index: 12;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 260px minmax(0, 1fr);
   align-items: center;
   gap: 18px;
   padding: 18px 28px;
@@ -386,9 +386,24 @@
   box-shadow: var(--shadow);
 }
 
+.topbar-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+.topbar-menu {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
 .brand {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 .brand-name {
   display: flex;
@@ -396,6 +411,7 @@
   gap: 10px;
   font-weight: 700;
   letter-spacing: 0.3px;
+  min-width: 0;
 }
 .brand-logo {
   width: 38px;
@@ -414,6 +430,28 @@
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #fdfdfd;
+}
+.hamburger-btn {
+  display: none;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+.hamburger-btn span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .search {
@@ -1471,6 +1509,25 @@
   }
   .topbar {
     grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 16px;
+  }
+  .topbar-menu {
+    display: none;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .topbar-menu.open {
+    display: grid;
+  }
+  .hamburger-btn {
+    display: inline-flex;
+  }
+  .search {
+    width: 100%;
+  }
+  .icon-btn {
+    width: 100%;
   }
   .apply-grid {
     grid-template-columns: 1fr;

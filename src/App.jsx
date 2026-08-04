@@ -33,6 +33,7 @@ const practiceAreas = [
   'Premises Liability',
   'Medical Malpractice',
   'Products Liability',
+  'Trucking',
   'Employment',
   'Animal Liability',
   'Workplace Safety',
@@ -83,6 +84,7 @@ function App() {
   const [myAgreements, setMyAgreements] = useState({})
   const [selectedCaseId, setSelectedCaseId] = useState(null)
   const [page, setPage] = useState('marketplace')
+  const [navOpen, setNavOpen] = useState(false)
   const [notificationPrefs, setNotificationPrefs] = useState(defaultNotificationPreferences)
   const [notificationDraft, setNotificationDraft] = useState(defaultNotificationPreferences)
   const [notificationLoading, setNotificationLoading] = useState(false)
@@ -513,6 +515,7 @@ function App() {
   }
 
   const handleSignOut = async () => {
+    setNavOpen(false)
     setSignInMessage('')
     setSignupMessage('')
     setSignOutLoading(true)
@@ -533,6 +536,11 @@ function App() {
 
   const handleNotificationCadence = (value) => {
     setNotificationDraft((prev) => ({ ...prev, alertCadence: value }))
+  }
+
+  const togglePage = () => {
+    setPage((current) => (current === 'profile' ? 'marketplace' : 'profile'))
+    setNavOpen(false)
   }
 
   const handleSaveNotificationPreferences = async (event) => {
@@ -669,47 +677,63 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">
-          <div className="brand-name">
-            <img src={tliLogo} alt="TLI logo" className="brand-logo" /> TLI Marketplace
+        <div className="topbar-main">
+          <div className="brand">
+            <div className="brand-name">
+              <img src={tliLogo} alt="TLI logo" className="brand-logo" /> TLI Marketplace
+            </div>
+            <div className="brand-sub">
+              Dashboard — {userIdentity.displayName || userIdentity.email || 'Guest'}
+            </div>
+            <div className="private-pill">Private lawyer-specific view</div>
           </div>
-          <div className="brand-sub">
-            Dashboard — {userIdentity.displayName || userIdentity.email || 'Guest'}
-          </div>
-          <div className="private-pill">Private lawyer-specific view</div>
+          <button
+            className="hamburger-btn"
+            type="button"
+            onClick={() => setNavOpen((open) => !open)}
+            aria-label={navOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={navOpen}
+            aria-controls="topbar-menu"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
         </div>
-        {page === 'marketplace' ? (
-          <div className="search">
-            <SearchIcon />
-            <input
-              type="text"
-              placeholder="Search by case or fact pattern…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-        ) : (
-          <div className="topbar-title">
-            <span>Profile settings</span>
-            <small>Notification preferences for new marketplace cases</small>
-          </div>
-        )}
-        <button
-          className={`icon-btn ${page === 'profile' ? 'active' : ''}`}
-          type="button"
-          onClick={() => setPage(page === 'profile' ? 'marketplace' : 'profile')}
-          aria-label={page === 'profile' ? 'Back to marketplace' : 'Open profile settings'}
-        >
-          <SettingsIcon />
-          {page === 'profile' ? 'Marketplace' : 'Settings'}
-        </button>
-        <button className="icon-btn" type="button" aria-label="Saved cases">
-          <BookmarkIcon />
-          Saved
-        </button>
-        <button className="icon-btn" type="button" onClick={handleSignOut} disabled={signOutLoading}>
-          {signOutLoading ? 'Signing out…' : 'Sign out'}
-        </button>
+        <div id="topbar-menu" className={`topbar-menu ${navOpen ? 'open' : ''}`}>
+          {page === 'marketplace' ? (
+            <div className="search">
+              <SearchIcon />
+              <input
+                type="text"
+                placeholder="Search by case or fact pattern…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div className="topbar-title">
+              <span>Profile settings</span>
+              <small>Notification preferences for new marketplace cases</small>
+            </div>
+          )}
+          <button
+            className={`icon-btn ${page === 'profile' ? 'active' : ''}`}
+            type="button"
+            onClick={togglePage}
+            aria-label={page === 'profile' ? 'Back to marketplace' : 'Open profile settings'}
+          >
+            <SettingsIcon />
+            {page === 'profile' ? 'Marketplace' : 'Settings'}
+          </button>
+          <button className="icon-btn" type="button" aria-label="Saved cases">
+            <BookmarkIcon />
+            Saved
+          </button>
+          <button className="icon-btn" type="button" onClick={handleSignOut} disabled={signOutLoading}>
+            {signOutLoading ? 'Signing out…' : 'Sign out'}
+          </button>
+        </div>
       </header>
 
       {page === 'profile' ? (

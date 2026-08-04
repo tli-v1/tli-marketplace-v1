@@ -15,6 +15,23 @@ mutation EnsureUserProfile(
   )
 }
 
+mutation UpsertLawyerUserProfile(
+  $emailNewCases: Boolean!
+  $smsNewCases: Boolean!
+  $alertTimeframe: AlertTimeframe!
+) @auth(expr: "auth.token.role == 'lawyer'") {
+  lawyerUserProfile_upsert(
+    data: {
+      lawyerId_expr: "auth.uid"
+      emailNewCases: $emailNewCases
+      smsNewCases: $smsNewCases
+      alertTimeframe: $alertTimeframe
+      createdAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
 mutation CreateCase(
   $consentStore: Boolean!
   $consentContact: Boolean!
@@ -48,6 +65,7 @@ mutation CreateIncident(
   $description: String!
   $incidentDate: Date!
   $city: String
+  $locationDetails: String
   $stateCode: String
 ) @auth(level: USER) @transaction {
   query @redact {
@@ -68,6 +86,7 @@ mutation CreateIncident(
       description: $description
       incidentDate: $incidentDate
       city: $city
+      locationDetails: $locationDetails
       stateCode: $stateCode
       createdAt_expr: "request.time"
     }
@@ -76,10 +95,17 @@ mutation CreateIncident(
 
 mutation CreateDamages(
   $caseId: UUID!
+  $injuries: String
+  $treatment: String
   $medicalBillsUsd: Float
+  $propertyDamageUsd: Float
+  $otherExpensesUsd: Float
   $daysMissed: Int
-  $dailyRateUsd: Float
+  $hourlyRateUsd: Float
   $lostWagesUsd: Float
+  $emotionalImpact: String
+  $otherDamages: String
+  $details: String
 ) @auth(level: USER) @transaction {
   query @redact {
     case(
@@ -96,10 +122,17 @@ mutation CreateDamages(
   damage_insert(
     data: {
       caseId: $caseId
+      injuries: $injuries
+      treatment: $treatment
       medicalBillsUsd: $medicalBillsUsd
+      propertyDamageUsd: $propertyDamageUsd
+      otherExpensesUsd: $otherExpensesUsd
       daysMissed: $daysMissed
-      dailyRateUsd: $dailyRateUsd
+      hourlyRateUsd: $hourlyRateUsd
       lostWagesUsd: $lostWagesUsd
+      emotionalImpact: $emotionalImpact
+      otherDamages: $otherDamages
+      details: $details
     }
   )
 }
@@ -229,6 +262,81 @@ mutation CreateLawyerClientAgreement(
       contentType: $contentType
       fileSize: $fileSize
       createdAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateLawFirmApplication(
+  $lawFirmName: String!
+  $primaryContactName: String!
+  $email: String!
+  $phone: String!
+  $website: String
+  $numberOfAttorneys: Int!
+  $monthlyCaseCapacity: Int!
+  $googleBusinessProfileUrl: String!
+  $googleRating: Float!
+  $approximateClientsServed: Int
+  $clientServiceYears: Float
+  $marketplaceFit: String!
+  $attorneysGoodStanding: GoodStandingAnswer!
+  $goodStandingExplanation: String
+) @auth(level: PUBLIC, insecureReason: "Law firms submit applications before marketplace account approval") {
+  lawFirmApplication_insert(
+    data: {
+      lawFirmName: $lawFirmName
+      primaryContactName: $primaryContactName
+      email: $email
+      phone: $phone
+      website: $website
+      numberOfAttorneys: $numberOfAttorneys
+      monthlyCaseCapacity: $monthlyCaseCapacity
+      googleBusinessProfileUrl: $googleBusinessProfileUrl
+      googleRating: $googleRating
+      approximateClientsServed: $approximateClientsServed
+      clientServiceYears: $clientServiceYears
+      marketplaceFit: $marketplaceFit
+      attorneysGoodStanding: $attorneysGoodStanding
+      goodStandingExplanation: $goodStandingExplanation
+      status: NEW
+      createdAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation AddLawFirmApplicationState(
+  $applicationId: UUID!
+  $stateCode: String!
+) @auth(level: PUBLIC, insecureReason: "Law firms submit selected states before marketplace account approval") {
+  lawFirmApplicationState_insert(
+    data: {
+      applicationId: $applicationId
+      stateCode: $stateCode
+    }
+  )
+}
+
+mutation AddLawFirmApplicationPracticeArea(
+  $applicationId: UUID!
+  $name: String!
+) @auth(level: PUBLIC, insecureReason: "Law firms submit selected practice areas before marketplace account approval") {
+  lawFirmApplicationPracticeArea_insert(
+    data: {
+      applicationId: $applicationId
+      name: $name
+    }
+  )
+}
+
+mutation AddLawFirmApplicationCasePreference(
+  $applicationId: UUID!
+  $name: String!
+) @auth(level: PUBLIC, insecureReason: "Law firms submit case preferences before marketplace account approval") {
+  lawFirmApplicationCasePreference_insert(
+    data: {
+      applicationId: $applicationId
+      name: $name
     }
   )
 }
