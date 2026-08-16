@@ -60,6 +60,22 @@ mutation DeleteCase($caseId: UUID!) @auth(level: USER) {
   )
 }
 
+mutation AdminDeleteCase($caseId: UUID!) @auth(expr: "auth.token.admin == true || auth.token.owner == true") @transaction {
+  query @redact {
+    case(key: { id: $caseId }) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  lawyerClientAgreementFile_deleteMany(where: { agreement: { caseId: { eq: $caseId } } })
+  lawyerClientAgreement_deleteMany(where: { caseId: { eq: $caseId } })
+  document_deleteMany(where: { caseId: { eq: $caseId } })
+  party_deleteMany(where: { caseId: { eq: $caseId } })
+  caseContact_deleteMany(where: { caseId: { eq: $caseId } })
+  damage_deleteMany(where: { caseId: { eq: $caseId } })
+  incident_deleteMany(where: { caseId: { eq: $caseId } })
+  case_delete(key: { id: $caseId })
+}
+
 mutation CreateIncident(
   $caseId: UUID!
   $description: String!
@@ -205,6 +221,7 @@ mutation CreateDocument(
   $kind: DocKind!
   $originalFilename: String
   $storagePath: String
+  $notes: String
 ) @auth(level: USER) @transaction {
   query @redact {
     case(
@@ -224,10 +241,269 @@ mutation CreateDocument(
       kind: $kind
       originalFilename: $originalFilename
       storagePath: $storagePath
+      notes: $notes
       uploadedBy_expr: "auth.uid"
       uploadedAt_expr: "request.time"
     }
   )
+}
+
+mutation DeleteParty(
+  $caseId: UUID!
+  $partyId: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  party_delete(
+    first: {
+      where: {
+        id: { eq: $partyId }
+        caseId: { eq: $caseId }
+      }
+    }
+  ) @check(expr: "this != null", message: "Party not found")
+}
+
+mutation DeleteDocument(
+  $caseId: UUID!
+  $documentId: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  document_delete(
+    first: {
+      where: {
+        id: { eq: $documentId }
+        caseId: { eq: $caseId }
+      }
+    }
+  ) @check(expr: "this != null", message: "Document not found")
+}
+
+mutation UpdateCase(
+  $caseId: UUID!
+  $status: CaseStatus!
+  $consentStore: Boolean!
+  $consentContact: Boolean!
+) @auth(level: USER) @transaction {
+  case_update(
+    first: {
+      where: {
+        id: { eq: $caseId }
+        userId: { eq_expr: "auth.uid" }
+      }
+    }
+    data: {
+      status: $status
+      consentStore: $consentStore
+      consentContact: $consentContact
+      updatedAt_expr: "request.time"
+    }
+  ) @check(expr: "this != null", message: "Case not found")
+}
+
+mutation UpdateIncident(
+  $caseId: UUID!
+  $incidentId: UUID!
+  $description: String!
+  $incidentDate: Date!
+  $city: String
+  $stateCode: String
+  $locationDetails: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  incident_update(
+    first: {
+      where: {
+        id: { eq: $incidentId }
+        caseId: { eq: $caseId }
+      }
+    }
+    data: {
+      description: $description
+      incidentDate: $incidentDate
+      city: $city
+      stateCode: $stateCode
+      locationDetails: $locationDetails
+    }
+  ) @check(expr: "this != null", message: "Incident not found")
+}
+
+mutation UpdateDamages(
+  $caseId: UUID!
+  $injuries: String
+  $treatment: String
+  $medicalBillsUsd: Float
+  $propertyDamageUsd: Float
+  $otherExpensesUsd: Float
+  $daysMissed: Int
+  $hourlyRateUsd: Float
+  $lostWagesUsd: Float
+  $emotionalImpact: String
+  $otherDamages: String
+  $details: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  damage_upsert(
+    data: {
+      caseId: $caseId
+      injuries: $injuries
+      treatment: $treatment
+      medicalBillsUsd: $medicalBillsUsd
+      propertyDamageUsd: $propertyDamageUsd
+      otherExpensesUsd: $otherExpensesUsd
+      daysMissed: $daysMissed
+      hourlyRateUsd: $hourlyRateUsd
+      lostWagesUsd: $lostWagesUsd
+      emotionalImpact: $emotionalImpact
+      otherDamages: $otherDamages
+      details: $details
+    }
+  )
+}
+
+mutation UpdateCaseContact(
+  $caseId: UUID!
+  $fullName: String
+  $method: ContactMethod!
+  $email: String
+  $phone: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  caseContact_upsert(
+    data: {
+      caseId: $caseId
+      fullName: $fullName
+      method: $method
+      email: $email
+      phone: $phone
+    }
+  )
+}
+
+mutation UpdateParty(
+  $caseId: UUID!
+  $partyId: UUID!
+  $role: PartyRole!
+  $name: String!
+  $insurerName: String
+  $policyNumber: String
+  $claimNumber: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  party_update(
+    first: {
+      where: {
+        id: { eq: $partyId }
+        caseId: { eq: $caseId }
+      }
+    }
+    data: {
+      role: $role
+      name: $name
+      insurerName: $insurerName
+      policyNumber: $policyNumber
+      claimNumber: $claimNumber
+    }
+  ) @check(expr: "this != null", message: "Party not found")
+}
+
+mutation UpdateDocument(
+  $caseId: UUID!
+  $documentId: UUID!
+  $kind: DocKind!
+  $originalFilename: String
+  $notes: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    case(
+      first: {
+        where: {
+          id: { eq: $caseId }
+          userId: { eq_expr: "auth.uid" }
+        }
+      }
+    ) @check(expr: "this != null", message: "Case not found") {
+      id
+    }
+  }
+  document_update(
+    first: {
+      where: {
+        id: { eq: $documentId }
+        caseId: { eq: $caseId }
+      }
+    }
+    data: {
+      kind: $kind
+      originalFilename: $originalFilename
+      notes: $notes
+    }
+  ) @check(expr: "this != null", message: "Document not found")
 }
 
 mutation CreateLawyerClientAgreement(

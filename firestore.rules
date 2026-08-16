@@ -7,7 +7,112 @@ service cloud.firestore {
     }
 
     function isLawyer() {
-      return signedIn() && request.auth.token.role == 'lawyer';
+      return signedIn()
+        && (request.auth.token.role in ['lawyer', 'admin', 'owner']
+          || request.auth.token.admin == true
+          || request.auth.token.owner == true);
+    }
+
+    function validLawyerUserProfile(lawyerId) {
+      return request.resource.data.keys().hasOnly([
+          'lawyer_id',
+          'notification_preferences',
+          'alert_timeframe',
+          'updated_at'
+        ])
+        && request.resource.data.lawyer_id == lawyerId
+        && request.resource.data.alert_timeframe in ['immediate', 'daily', 'weekly']
+        && request.resource.data.notification_preferences is map
+        && request.resource.data.notification_preferences.keys()
+          .hasOnly(['email_new_cases', 'sms_new_cases'])
+        && request.resource.data.notification_preferences.email_new_cases is bool
+        && request.resource.data.notification_preferences.sms_new_cases is bool;
+    }
+
+    function isNonEmptyString(value, maxLength) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= maxLength;
+    }
+
+    function isOptionalString(value, maxLength) {
+      return value is string
+        && value.size() <= maxLength;
+    }
+
+    function isIntBetween(value, minValue, maxValue) {
+      return value is int
+        && value >= minValue
+        && value <= maxValue;
+    }
+
+    function isOptionalIntBetween(value, minValue, maxValue) {
+      return value == null
+        || isIntBetween(value, minValue, maxValue);
+    }
+
+    function isOptionalNumberBetween(value, minValue, maxValue) {
+      return value == null
+        || ((value is int || value is float) && value >= minValue && value <= maxValue);
+    }
+
+    function isRating(value) {
+      return value == null
+        || ((value is int || value is float) && value >= 0 && value <= 5);
+    }
+
+    function validLawFirmApplication() {
+      return request.resource.data.keys().hasOnly([
+          'law_firm_name',
+          'primary_contact_name',
+          'email',
+          'phone',
+          'website',
+          'states_served',
+          'practice_areas',
+          'number_of_attorneys',
+          'preferred_case_types',
+          'monthly_case_capacity',
+          'google_business_profile_url',
+          'google_rating',
+          'approximate_clients_served',
+          'client_service_years',
+          'marketplace_fit',
+          'attorneys_good_standing',
+          'good_standing_explanation',
+          'accuracy_certified',
+          'status',
+          'created_at'
+        ])
+        && request.resource.data.status == 'new'
+        && request.resource.data.created_at == request.time
+        && isNonEmptyString(request.resource.data.law_firm_name, 160)
+        && isNonEmptyString(request.resource.data.primary_contact_name, 120)
+        && isNonEmptyString(request.resource.data.email, 180)
+        && isNonEmptyString(request.resource.data.phone, 60)
+        && isOptionalString(request.resource.data.website, 240)
+        && request.resource.data.states_served is list
+        && request.resource.data.states_served.size() > 0
+        && request.resource.data.states_served.size() <= 80
+        && request.resource.data.practice_areas is list
+        && request.resource.data.practice_areas.size() > 0
+        && request.resource.data.practice_areas.size() <= 40
+        && isIntBetween(request.resource.data.number_of_attorneys, 1, 10000)
+        && request.resource.data.preferred_case_types is list
+        && request.resource.data.preferred_case_types.size() > 0
+        && request.resource.data.preferred_case_types.size() <= 20
+        && isIntBetween(request.resource.data.monthly_case_capacity, 0, 10000)
+        && isNonEmptyString(request.resource.data.google_business_profile_url, 300)
+        && request.resource.data.google_rating != null
+        && isRating(request.resource.data.google_rating)
+        && isOptionalIntBetween(request.resource.data.approximate_clients_served, 0, 10000000)
+        && isOptionalNumberBetween(request.resource.data.client_service_years, 0, 250)
+        && isNonEmptyString(request.resource.data.marketplace_fit, 200)
+        && request.resource.data.attorneys_good_standing in ['yes', 'no']
+        && isOptionalString(request.resource.data.good_standing_explanation, 1000)
+        && (request.resource.data.attorneys_good_standing == 'yes'
+          || request.resource.data.good_standing_explanation.size() > 0)
+        && request.resource.data.accuracy_certified == true;
     }
 
     match /cases/{caseId} {
@@ -25,10 +130,23 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /lawyer_user_profiles/{lawyerId} {
+      allow read: if isLawyer() && request.auth.uid == lawyerId;
+      allow create, update: if isLawyer()
+        && request.auth.uid == lawyerId
+        && validLawyerUserProfile(lawyerId);
+      allow delete: if false;
+    }
+
     match /agreements/{agreementId} {
       allow read: if isLawyer() && resource.data.lawyer_id == request.auth.uid;
       allow create: if isLawyer() && request.resource.data.lawyer_id == request.auth.uid;
       allow update, delete: if false;
+    }
+
+    match /law_firm_applications/{applicationId} {
+      allow create: if validLawFirmApplication();
+      allow read, update, delete: if false;
     }
 
     match /{document=**} {

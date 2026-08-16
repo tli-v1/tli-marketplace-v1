@@ -1,89 +1,9 @@
-query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
-  cases(orderBy: [{ createdAt: DESC }]) {
-    id
-    userId
-    status
-    consentStore
-    consentContact
-    consentAt
-    createdAt
-    updatedAt
-    lawyerCaseIncidents: incidents_on_case(limit: 1) {
-      id
-      caseId
-      city
-      locationDetails
-      stateCode
-      incidentDate
-      description
-      createdAt
-    }
-    damage_on_case {
-      caseId
-      injuries
-      treatment
-      medicalBillsUsd
-      propertyDamageUsd
-      otherExpensesUsd
-      daysMissed
-      hourlyRateUsd
-      lostWagesUsd
-      emotionalImpact
-      otherDamages
-      details
-    }
-    caseContact_on_case {
-      caseId
-      fullName
-      method
-      email
-      phone
-    }
-    parties_on_case {
-      id
-      caseId
-      role
-      name
-      insurerName
-      policyNumber
-      claimNumber
-      createdAt
-    }
-    lawyerCaseDocuments: documents_on_case(orderBy: [{ uploadedAt: DESC }]) {
-      id
-      caseId
-      kind
-      originalFilename
-      storagePath
-      uploadedBy
-      uploadedAt
-      notes
-    }
-    lawyerCaseAgreements: lawyerClientAgreements_on_case(orderBy: [{ createdAt: DESC }]) {
-      id
-      caseId
-      lawyerId
-      message
-      createdAt
-      updatedAt
-      lawyerAgreementFiles: lawyerClientAgreementFiles_on_agreement(orderBy: [{ createdAt: ASC }]) {
-        id
-        agreementId
-        fileName
-        storagePath
-        publicUrl
-        contentType
-        fileSize
-        createdAt
-      }
-    }
-  }
-}
-
-query GetUserCases @auth(level: USER) {
+query GetUserCases($limit: Int! = 10, $offset: Int! = 0) @auth(level: USER) {
   cases(
     where: { userId: { eq_expr: "auth.uid" } }
-    orderBy: [{ createdAt: DESC }]
+    orderBy: [{ createdAt: DESC }, { id: DESC }]
+    limit: $limit
+    offset: $offset
   ) {
     id
     status
@@ -98,6 +18,12 @@ query GetUserCases @auth(level: USER) {
     caseListAgreements: lawyerClientAgreements_on_case {
       id
     }
+  }
+  caseCount: cases(
+    where: { userId: { eq_expr: "auth.uid" } }
+    limit: 1
+  ) {
+    _count
   }
 }
 
@@ -115,8 +41,8 @@ query GetCaseDetails($caseId: UUID!) @auth(level: USER) {
       id
       caseId
       city
-      locationDetails
       stateCode
+      locationDetails
       incidentDate
       description
       createdAt
@@ -210,7 +136,89 @@ query GetStateCodes @auth(level: PUBLIC, insecureReason: "State codes are public
   }
 }
 
-query GetMyAgreements @auth(level: USER) {
+query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
+  cases(orderBy: [{ createdAt: DESC }, { id: DESC }]) {
+    id
+    userId
+    status
+    consentStore
+    consentContact
+    consentAt
+    createdAt
+    updatedAt
+    lawyerCaseIncidents: incidents_on_case(limit: 1) {
+      id
+      caseId
+      city
+      locationDetails
+      stateCode
+      incidentDate
+      description
+      createdAt
+    }
+    damage_on_case {
+      caseId
+      injuries
+      treatment
+      medicalBillsUsd
+      propertyDamageUsd
+      otherExpensesUsd
+      daysMissed
+      hourlyRateUsd
+      lostWagesUsd
+      emotionalImpact
+      otherDamages
+      details
+    }
+    caseContact_on_case {
+      caseId
+      fullName
+      method
+      email
+      phone
+    }
+    parties_on_case {
+      id
+      caseId
+      role
+      name
+      insurerName
+      policyNumber
+      claimNumber
+      createdAt
+    }
+    lawyerCaseDocuments: documents_on_case(orderBy: [{ uploadedAt: DESC }]) {
+      id
+      caseId
+      kind
+      originalFilename
+      storagePath
+      uploadedBy
+      uploadedAt
+      notes
+    }
+    lawyerCaseAgreements: lawyerClientAgreements_on_case(orderBy: [{ createdAt: DESC }]) {
+      id
+      caseId
+      lawyerId
+      message
+      createdAt
+      updatedAt
+      lawyerAgreementFiles: lawyerClientAgreementFiles_on_agreement(orderBy: [{ createdAt: ASC }]) {
+        id
+        agreementId
+        fileName
+        storagePath
+        publicUrl
+        contentType
+        fileSize
+        createdAt
+      }
+    }
+  }
+}
+
+query GetMyAgreements @auth(expr: "auth.token.role == 'lawyer'") {
   lawyerClientAgreements(
     where: { lawyerId: { eq_expr: "auth.uid" } }
     orderBy: [{ createdAt: DESC }]

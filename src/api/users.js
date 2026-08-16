@@ -1,5 +1,5 @@
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
-import { getUserProfile } from '@dataconnect/generated'
+import { getLawyerUserProfile, getUserProfile, upsertLawyerUserProfile } from '@dataconnect/generated'
 import { db } from '../firebase'
 
 export const defaultNotificationPreferences = {
@@ -7,6 +7,8 @@ export const defaultNotificationPreferences = {
   smsNewCases: false,
   alertCadence: 'daily',
 }
+
+const validAlertCadences = ['immediate', 'daily', 'weekly']
 
 export const fetchUserProfile = async (userId) => {
   if (!userId) return { data: null, error: null }
@@ -45,17 +47,38 @@ export const fetchNotificationPreferences = async (userId) => {
   try {
     const snapshot = await getDoc(doc(db, 'lawyer_user_profiles', userId))
     const raw = snapshot.exists() ? snapshot.data() : null
-    const notificationPreferences = raw?.notification_preferences || {}
-    return {
-      data: {
-        ...defaultNotificationPreferences,
-        emailNewCases: Boolean(notificationPreferences.email_new_cases),
-        smsNewCases: Boolean(notificationPreferences.sms_new_cases),
-        alertCadence: ['daily', 'weekly'].includes(raw?.alert_timeframe) ? raw.alert_timeframe : 'daily',
-      },
-      error: null,
+    if (raw) {
+      const notificationPreferences = raw?.notification_preferences || {}
+      return {
+        data: {
+          ...defaultNotificationPreferences,
+          emailNewCases: Boolean(notificationPreferences.email_new_cases),
+          smsNewCases: Boolean(notificationPreferences.sms_new_cases),
+          alertCadence: validAlertCadences.includes(raw?.alert_timeframe) ? raw.alert_timeframe : 'daily',
+        },
+        error: null,
+      }
     }
   } catch (error) {
+    console.warn('Firestore lawyer profile fetch failed, falling back to SQL Connect', error)
+  }
+
+  try {
+    const result = await getLawyerUserProfile()
+    const profile = result.data?.lawyerUserProfile
+    if (profile) {
+      return {
+        data: {
+          ...defaultNotificationPreferences,
+          emailNewCases: Boolean(profile.emailNewCases),
+          smsNewCases: Boolean(profile.smsNewCases),
+          alertCadence: profile.alertTimeframe?.toLowerCase?.() === 'weekly' ? 'weekly' : 'daily',
+        },
+        error: null,
+      }
+    }
+  } catch (error) {
+    console.warn('SQL Connect lawyer profile fetch failed', error)
     return {
       data: defaultNotificationPreferences,
       error: {
@@ -74,10 +97,18 @@ export const saveNotificationPreferences = async (userId, preferences) => {
   const normalized = {
     emailNewCases: Boolean(preferences.emailNewCases),
     smsNewCases: Boolean(preferences.smsNewCases),
-    alertCadence: ['daily', 'weekly'].includes(preferences.alertCadence) ? preferences.alertCadence : 'daily',
+    alertCadence: validAlertCadences.includes(preferences.alertCadence) ? preferences.alertCadence : 'daily',
   }
 
   try {
+    if (['daily', 'weekly'].includes(normalized.alertCadence)) {
+      await upsertLawyerUserProfile({
+        emailNewCases: normalized.emailNewCases,
+        smsNewCases: normalized.smsNewCases,
+        alertTimeframe: normalized.alertCadence.toUpperCase(),
+      })
+    }
+
     await setDoc(
       doc(db, 'lawyer_user_profiles', userId),
       {

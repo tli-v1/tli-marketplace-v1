@@ -1,7 +1,8 @@
 import { collection, getDocs } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
 import { getBlob, ref } from 'firebase/storage'
-import { getLawyerCases } from '@dataconnect/generated'
-import { db, storage } from '../firebase'
+import { adminDeleteCase, getLawyerCases } from '@dataconnect/generated'
+import { db, functions, storage } from '../firebase'
 
 const VIEW_FILE_TIMEOUT_MS = 20000
 
@@ -139,6 +140,78 @@ export const fetchCases = async () => {
           code: fallbackError?.code || error?.code,
         },
       }
+    }
+  }
+}
+
+const getStoragePath = (item) => item?.storage_path || item?.storagePath || item?.path || ''
+
+const collectCaseStoragePaths = (caseRow) => {
+  const documents = Array.isArray(caseRow?.documents) ? caseRow.documents : []
+  const agreements = Array.isArray(caseRow?.agreements) ? caseRow.agreements : []
+  const agreementFiles = agreements.flatMap((agreement) => (Array.isArray(agreement.files) ? agreement.files : []))
+
+  return [...new Set([...documents, ...agreementFiles].map(getStoragePath).filter(Boolean))]
+}
+
+export const deleteCaseAsAdmin = async (caseOrId) => {
+  const caseId = typeof caseOrId === 'string' ? caseOrId : caseOrId?.id
+  const storagePaths = typeof caseOrId === 'string' ? [] : collectCaseStoragePaths(caseOrId)
+
+  try {
+    await adminDeleteCase({ caseId })
+  } catch (error) {
+    return {
+      data: null,
+      error: {
+        message: error?.message || 'Failed to delete case',
+        code: error?.code,
+      },
+    }
+  }
+
+  if (!storagePaths.length) {
+    return { data: { caseDeleted: true, deletedFileCount: 0 }, error: null }
+  }
+
+  try {
+    const callable = httpsCallable(functions, 'deleteCaseStorageFiles')
+    const result = await callable({ caseId, storagePaths })
+    return {
+      data: {
+        caseDeleted: true,
+        deletedFileCount: result.data?.deletedCount || 0,
+        deletedPaths: result.data?.deletedPaths || [],
+      },
+      error: null,
+    }
+  } catch (error) {
+    return {
+      data: { caseDeleted: true, deletedFileCount: 0 },
+      error: {
+        message: error?.message || 'Case deleted, but failed to delete one or more storage files',
+        code: error?.code,
+      },
+    }
+  }
+}
+
+export const enqueueNewCaseNotification = async ({ caseId, title = '', description = '', stateCode = '', source = 'case-created' }) => {
+  if (!caseId) {
+    return { data: null, error: { message: 'Missing case id' } }
+  }
+
+  try {
+    const callable = httpsCallable(functions, 'enqueueMarketplaceCaseNotification')
+    const result = await callable({ caseId, title, description, stateCode, source })
+    return { data: result.data, error: null }
+  } catch (error) {
+    return {
+      data: null,
+      error: {
+        message: error?.message || 'Failed to queue new case notification',
+        code: error?.code,
+      },
     }
   }
 }

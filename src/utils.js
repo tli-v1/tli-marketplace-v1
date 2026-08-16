@@ -80,5 +80,6 @@ export const mapCaseRow = (row) => {
       phone: contact.phone,
     },
     documents: row.documents || [],
+    agreements: row.agreements || [],
   }
 }

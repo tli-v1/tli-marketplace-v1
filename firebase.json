@@ -2,6 +2,13 @@
   "dataconnect": {
     "source": "dataconnect"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "marketplace-admin",
+      "runtime": "nodejs22"
+    }
+  ],
   "hosting": {
     "site": "peak-bit-486121-n6-74a84",
     "public": "dist",

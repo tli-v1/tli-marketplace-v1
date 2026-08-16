@@ -13,6 +13,7 @@ import CaseDetail from './components/CaseDetail'
 import CaseTable from './components/CaseTable'
 import StateFilter from './components/StateFilter'
 import LawFirmApplicationPage from './pages/LawFirmApplicationPage'
+import AdminPage from './pages/AdminPage'
 import { mapCaseRow, parseValueCeiling } from './utils'
 import { fetchCases } from './api/cases'
 import { fetchStateCodes } from './api/stateCodes'
@@ -80,6 +81,7 @@ function App() {
   const [authChecked, setAuthChecked] = useState(false)
   const [roleChecked, setRoleChecked] = useState(false)
   const [isAuthorized, setIsAuthorized] = useState(false)
+  const [userRole, setUserRole] = useState('')
   const [agreementState, setAgreementState] = useState({})
   const [myAgreements, setMyAgreements] = useState({})
   const [selectedCaseId, setSelectedCaseId] = useState(null)
@@ -87,7 +89,6 @@ function App() {
   const [navOpen, setNavOpen] = useState(false)
   const [notificationPrefs, setNotificationPrefs] = useState(defaultNotificationPreferences)
   const [notificationDraft, setNotificationDraft] = useState(defaultNotificationPreferences)
-  const [notificationLoading, setNotificationLoading] = useState(false)
   const [notificationSaving, setNotificationSaving] = useState(false)
   const [notificationMessage, setNotificationMessage] = useState('')
   const showAuth = import.meta.env.VITE_SHOW_SIGN_IN === 'true'
@@ -139,22 +140,23 @@ function App() {
       if (!session?.user?.id) {
         setRoleChecked(false)
         setIsAuthorized(false)
+        setUserRole('')
         return
       }
       const cacheKey = `role-cache:${session.user.id}`
       const cachedRole = localStorage.getItem(cacheKey)
-      if (cachedRole === 'lawyer') {
+      if (['lawyer', 'admin', 'owner'].includes(cachedRole)) {
         setIsAuthorized(true)
+        setUserRole(cachedRole)
         setRoleChecked(true)
-        return
       }
       setRoleChecked(false)
-      const { isAuthorized, error } = await checkLawyerAccess(session.user.id)
-      const isLawyer = isAuthorized
-      setIsAuthorized(isLawyer)
+      const { isAuthorized, role, error } = await checkLawyerAccess(session.user.id)
+      setIsAuthorized(isAuthorized)
+      setUserRole(isAuthorized ? role : '')
       setRoleChecked(true)
-      localStorage.setItem(cacheKey, isLawyer ? 'lawyer' : 'denied')
-      if (!isLawyer) {
+      localStorage.setItem(cacheKey, isAuthorized ? role : 'denied')
+      if (!isAuthorized) {
         if (error) {
           console.error('Fetch user profile error', error)
         }
@@ -171,6 +173,10 @@ function App() {
       setError('')
       try {
         if (!authChecked) {
+          return
+        }
+        if (currentPath === '/admin') {
+          setLoading(false)
           return
         }
         if (!session) {
@@ -206,7 +212,7 @@ function App() {
     }
 
     loadCases()
-  }, [authChecked, session, roleChecked, isAuthorized])
+  }, [authChecked, session, roleChecked, isAuthorized, currentPath])
 
   useEffect(() => {
     const fetchUserIdentity = async () => {
@@ -234,6 +240,10 @@ function App() {
 
   useEffect(() => {
     const fetchMyAgreementsForUser = async () => {
+      if (currentPath === '/admin') {
+        setMyAgreements({})
+        return
+      }
       if (!session?.user?.id) {
         setMyAgreements({})
         return
@@ -255,10 +265,16 @@ function App() {
       setMyAgreements(map)
     }
     fetchMyAgreementsForUser()
-  }, [session])
+  }, [session, currentPath])
 
   useEffect(() => {
     const loadNotificationPreferences = async () => {
+      if (currentPath === '/admin') {
+        setNotificationPrefs(defaultNotificationPreferences)
+        setNotificationDraft(defaultNotificationPreferences)
+        setNotificationMessage('')
+        return
+      }
       if (!session?.user?.id) {
         setNotificationPrefs(defaultNotificationPreferences)
         setNotificationDraft(defaultNotificationPreferences)
@@ -266,21 +282,24 @@ function App() {
         return
       }
 
-      setNotificationLoading(true)
-      const { data, error } = await fetchNotificationPreferences(session.user.id)
-      setNotificationLoading(false)
-      if (error) {
+      try {
+        const { data, error } = await fetchNotificationPreferences(session.user.id)
+        if (error) {
+          console.error('Fetch notification preferences error', error)
+          setNotificationMessage(`Unable to load notification settings: ${error.message}`)
+          return
+        }
+        setNotificationPrefs(data)
+        setNotificationDraft(data)
+        setNotificationMessage('')
+      } catch (error) {
         console.error('Fetch notification preferences error', error)
         setNotificationMessage(`Unable to load notification settings: ${error.message}`)
-        return
       }
-      setNotificationPrefs(data)
-      setNotificationDraft(data)
-      setNotificationMessage('')
     }
 
     loadNotificationPreferences()
-  }, [session])
+  }, [session, currentPath])
 
   useEffect(() => {
     const loadStateCodes = async () => {
@@ -535,6 +554,7 @@ function App() {
   }
 
   const handleNotificationCadence = (value) => {
+    if (!['immediate', 'daily', 'weekly'].includes(value)) return
     setNotificationDraft((prev) => ({ ...prev, alertCadence: value }))
   }
 
@@ -543,22 +563,44 @@ function App() {
     setNavOpen(false)
   }
 
+  const navigateTo = (path) => {
+    window.history.pushState({}, '', path)
+    setCurrentPath(path)
+    setNavOpen(false)
+  }
+
+  const handleSwitchToAdminMode = () => {
+    const adminUrl = import.meta.env.VITE_ADMIN_URL
+    if (adminUrl) {
+      window.location.assign(adminUrl)
+      return
+    }
+    navigateTo('/admin')
+  }
+
+  const handleSwitchToMarketplace = () => {
+    navigateTo('/')
+  }
+
   const handleSaveNotificationPreferences = async (event) => {
     event.preventDefault()
     if (!session?.user?.id) return
 
     setNotificationMessage('')
     setNotificationSaving(true)
-    const { data, error } = await saveNotificationPreferences(session.user.id, notificationDraft)
-    setNotificationSaving(false)
-    if (error) {
-      setNotificationMessage(`Save failed: ${error.message}`)
-      return
-    }
+    try {
+      const { data, error } = await saveNotificationPreferences(session.user.id, notificationDraft)
+      if (error) {
+        setNotificationMessage(`Save failed: ${error.message}`)
+        return
+      }
 
-    setNotificationPrefs(data)
-    setNotificationDraft(data)
-    setNotificationMessage('Notification settings saved.')
+      setNotificationPrefs(data)
+      setNotificationDraft(data)
+      setNotificationMessage('Notification settings saved.')
+    } finally {
+      setNotificationSaving(false)
+    }
   }
 
   if (currentPath === '/apply') {
@@ -701,7 +743,12 @@ function App() {
           </button>
         </div>
         <div id="topbar-menu" className={`topbar-menu ${navOpen ? 'open' : ''}`}>
-          {page === 'marketplace' ? (
+          {currentPath === '/admin' ? (
+            <div className="topbar-title">
+              <span>Admin mode</span>
+              <small>Manage marketplace user roles</small>
+            </div>
+          ) : page === 'marketplace' ? (
             <div className="search">
               <SearchIcon />
               <input
@@ -720,12 +767,29 @@ function App() {
           <button
             className={`icon-btn ${page === 'profile' ? 'active' : ''}`}
             type="button"
-            onClick={togglePage}
-            aria-label={page === 'profile' ? 'Back to marketplace' : 'Open profile settings'}
+            onClick={currentPath === '/admin' ? handleSwitchToMarketplace : togglePage}
+            aria-label={
+              currentPath === '/admin'
+                ? 'Back to marketplace'
+                : page === 'profile'
+                  ? 'Back to marketplace'
+                  : 'Open profile settings'
+            }
           >
             <SettingsIcon />
-            {page === 'profile' ? 'Marketplace' : 'Settings'}
+            {currentPath === '/admin' || page === 'profile' ? 'Marketplace' : 'Settings'}
           </button>
+          {['admin', 'owner'].includes(userRole) && currentPath !== '/admin' && (
+            <button
+              className="icon-btn admin-switch-btn"
+              type="button"
+              onClick={handleSwitchToAdminMode}
+              aria-label="Switch to admin mode"
+            >
+              <AdminIcon />
+              Switch to admin mode
+            </button>
+          )}
           <button className="icon-btn" type="button" aria-label="Saved cases">
             <BookmarkIcon />
             Saved
@@ -736,7 +800,18 @@ function App() {
         </div>
       </header>
 
-      {page === 'profile' ? (
+      {currentPath === '/admin' ? (
+        ['admin', 'owner'].includes(userRole) ? (
+          <AdminPage currentUserRole={userRole} />
+        ) : (
+          <main className="admin-page">
+            <section className="admin-card">
+              <h1>Admin access required</h1>
+              <p>Your account does not have permission to manage marketplace users.</p>
+            </section>
+          </main>
+        )
+      ) : page === 'profile' ? (
         <main className="profile-page">
           <section className="profile-card">
             <div className="profile-head">
@@ -744,7 +819,9 @@ function App() {
                 <h1>Profile</h1>
                 <p>{userIdentity.email || session.user.email}</p>
               </div>
-              <div className="profile-badge">Lawyer</div>
+              <div className="profile-badge">
+                {userRole === 'owner' ? 'Owner' : userRole === 'admin' ? 'Admin' : 'Lawyer'}
+              </div>
             </div>
 
             <form className="profile-form" onSubmit={handleSaveNotificationPreferences}>
@@ -759,7 +836,7 @@ function App() {
                       type="checkbox"
                       checked={notificationDraft.emailNewCases}
                       onChange={() => handleNotificationToggle('emailNewCases')}
-                      disabled={notificationLoading || notificationSaving}
+                      disabled={notificationSaving}
                     />
                     <span>
                       <strong>Email alerts</strong>
@@ -771,7 +848,7 @@ function App() {
                       type="checkbox"
                       checked={notificationDraft.smsNewCases}
                       onChange={() => handleNotificationToggle('smsNewCases')}
-                      disabled={notificationLoading || notificationSaving}
+                      disabled={notificationSaving}
                     />
                     <span>
                       <strong>SMS alerts</strong>
@@ -784,25 +861,29 @@ function App() {
               <div className="settings-section">
                 <div>
                   <h2>Alert timeframe</h2>
-                  <p>Set how often new-case alerts should be grouped.</p>
+                  <p>Set whether new-case alerts are sent immediately or grouped.</p>
                 </div>
                 <div className="segmented-control" role="radiogroup" aria-label="Alert timeframe">
-                  <button
-                    type="button"
-                    className={notificationDraft.alertCadence === 'daily' ? 'active' : ''}
-                    onClick={() => handleNotificationCadence('daily')}
-                    disabled={notificationLoading || notificationSaving}
-                  >
-                    Daily
-                  </button>
-                  <button
-                    type="button"
-                    className={notificationDraft.alertCadence === 'weekly' ? 'active' : ''}
-                    onClick={() => handleNotificationCadence('weekly')}
-                    disabled={notificationLoading || notificationSaving}
-                  >
-                    Weekly
-                  </button>
+                  {[
+                    ['immediate', 'Immediate'],
+                    ['daily', 'Daily'],
+                    ['weekly', 'Weekly'],
+                  ].map(([value, label]) => (
+                    <label
+                      key={value}
+                      className={notificationDraft.alertCadence === value ? 'active' : ''}
+                    >
+                      <input
+                        type="radio"
+                        name="alertCadence"
+                        value={value}
+                        checked={notificationDraft.alertCadence === value}
+                        onChange={() => handleNotificationCadence(value)}
+                        disabled={notificationSaving}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
@@ -811,11 +892,11 @@ function App() {
                   type="button"
                   className="secondary-btn"
                   onClick={() => setNotificationDraft(notificationPrefs)}
-                  disabled={notificationLoading || notificationSaving}
+                  disabled={notificationSaving}
                 >
                   Reset
                 </button>
-                <button className="primary-btn" type="submit" disabled={notificationLoading || notificationSaving}>
+                <button className="primary-btn" type="submit" disabled={notificationSaving}>
                   {notificationSaving ? 'Saving…' : 'Save settings'}
                 </button>
               </div>
@@ -969,6 +1050,15 @@ const SettingsIcon = () => (
     <path
       fill="currentColor"
       d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm7.43 2.98c.04-.32.07-.65.07-.98s-.03-.66-.07-.98l2.08-1.62-2-3.46-2.45.98a7.34 7.34 0 0 0-1.7-.99L15 3.31h-4l-.36 2.62c-.6.24-1.17.57-1.7.99l-2.45-.98-2 3.46 2.08 1.62c-.04.32-.07.65-.07.98s.03.66.07.98L4.49 14.6l2 3.46 2.45-.98c.53.42 1.1.75 1.7.99L11 20.69h4l.36-2.62c.6-.24 1.17-.57 1.7-.99l2.45.98 2-3.46-2.08-1.62Zm-1.96-1.46.12.5-.12.5-.19.76 1.62 1.26-.34.58-1.91-.76-.61.49c-.38.3-.8.55-1.24.73l-.73.3-.28 2.04h-.68l-.28-2.04-.73-.3c-.44-.18-.86-.43-1.24-.73l-.61-.49-1.91.76-.34-.58 1.62-1.26-.19-.76a4.1 4.1 0 0 1-.12-.5c0-.16.04-.34.12-.5l.19-.76-1.62-1.26.34-.58 1.91.76.61-.49c.38-.3.8-.55 1.24-.73l.73-.3.28-2.04h.68l.28 2.04.73.3c.44.18.86.43 1.24.73l.61.49 1.91-.76.34.58-1.62 1.26.19.76Z"
+    />
+  </svg>
+)
+
+const AdminIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="currentColor"
+      d="M12 2 4 5.2v5.9c0 5.05 3.42 9.77 8 10.9 4.58-1.13 8-5.85 8-10.9V5.2L12 2Zm0 2.15 6 2.4v4.55c0 4.02-2.48 7.72-6 8.83-3.52-1.11-6-4.81-6-8.83V6.55l6-2.4Zm0 3.35a2.75 2.75 0 0 0-1 5.31v2.69h2v-2.69a2.75 2.75 0 0 0-1-5.31Zm0 2a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Z"
     />
   </svg>
 )

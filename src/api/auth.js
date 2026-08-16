@@ -113,8 +113,11 @@ export const checkLawyerAccess = async () => {
   try {
     const token = await auth.currentUser?.getIdTokenResult(true)
     const role = token?.claims?.role || token?.claims?.app_metadata?.role
-    return { isAuthorized: role === 'lawyer', error: null }
+    const isOwner = role === 'owner' || token?.claims?.owner === true
+    const isAdmin = role === 'admin' || token?.claims?.admin === true || isOwner
+    const isAuthorized = role === 'lawyer' || isAdmin
+    return { isAuthorized, role: isOwner ? 'owner' : isAdmin ? 'admin' : role || '', error: null }
   } catch (error) {
-    return { isAuthorized: false, error: toAuthError(error) }
+    return { isAuthorized: false, role: '', error: toAuthError(error) }
   }
 }
