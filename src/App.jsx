@@ -8,8 +8,8 @@ import {
   signOut,
   signUp,
 } from './api/auth'
-import CaseCard from './components/CaseCard'
 import CaseDetail from './components/CaseDetail'
+import WorkspaceSidebar from './components/WorkspaceSidebar'
 import CaseTable from './components/CaseTable'
 import StateFilter from './components/StateFilter'
 import LawFirmApplicationPage from './pages/LawFirmApplicationPage'
@@ -20,11 +20,14 @@ import { fetchStateCodes } from './api/stateCodes'
 import { fetchMyAgreements, submitAgreement } from './api/agreements'
 import {
   defaultNotificationPreferences,
+  ensureMarketplaceUserProfiles,
   fetchNotificationPreferences,
   fetchUserProfile,
   saveNotificationPreferences,
 } from './api/users'
+import { formatRetryCountdown } from './api/authErrors'
 import './App.css'
+import './workspace.css'
 
 const tliLogo = '/tli_logo.png'
 const fallbackStates = ['Missouri', 'Kansas', 'Nebraska', 'Iowa']
@@ -60,7 +63,6 @@ function App() {
   const [stateFilter, setStateFilter] = useState(new Set())
   const [practiceFilter, setPracticeFilter] = useState(new Set())
   const [sort, setSort] = useState('created')
-  const [view, setView] = useState('table')
   const [tablePage, setTablePage] = useState(1)
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
@@ -76,17 +78,20 @@ function App() {
   const [signInPassword, setSignInPassword] = useState('')
   const [signInMessage, setSignInMessage] = useState('')
   const [signInLoading, setSignInLoading] = useState(false)
+  const [signInRetryUntil, setSignInRetryUntil] = useState(0)
+  const [signInRetrySeconds, setSignInRetrySeconds] = useState(0)
   const [userIdentity, setUserIdentity] = useState({ displayName: '', email: '', phone: '' })
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [roleChecked, setRoleChecked] = useState(false)
+  const [profileProvisionError, setProfileProvisionError] = useState('')
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [userRole, setUserRole] = useState('')
   const [agreementState, setAgreementState] = useState({})
   const [myAgreements, setMyAgreements] = useState({})
-  const [selectedCaseId, setSelectedCaseId] = useState(null)
-  const [page, setPage] = useState('marketplace')
-  const [navOpen, setNavOpen] = useState(false)
+  const selectedCaseId = currentPath.match(/^\/cases\/([a-zA-Z0-9-]+)\/?$/)?.[1] || null
+  const page = currentPath === '/settings' ? 'profile' : 'marketplace'
+  const isAdminPage = currentPath === '/admin'
   const [notificationPrefs, setNotificationPrefs] = useState(defaultNotificationPreferences)
   const [notificationDraft, setNotificationDraft] = useState(defaultNotificationPreferences)
   const [notificationSaving, setNotificationSaving] = useState(false)
@@ -95,7 +100,20 @@ function App() {
   const tablePageSize = 10
 
   useEffect(() => {
-    const handlePopState = () => setCurrentPath(window.location.pathname)
+    if (!signInRetryUntil) return
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((signInRetryUntil - Date.now()) / 1000))
+      setSignInRetrySeconds(remaining)
+      if (!remaining) clearInterval(timer)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [signInRetryUntil])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname)
+      requestAnimationFrame(() => window.scrollTo(0, window.history.state?.scrollY || 0))
+    }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
@@ -136,11 +154,13 @@ function App() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     const checkRole = async () => {
       if (!session?.user?.id) {
         setRoleChecked(false)
         setIsAuthorized(false)
         setUserRole('')
+        setProfileProvisionError('')
         return
       }
       const cacheKey = `role-cache:${session.user.id}`
@@ -152,8 +172,14 @@ function App() {
       }
       setRoleChecked(false)
       const { isAuthorized, role, error } = await checkLawyerAccess(session.user.id)
+      if (cancelled) return
       setIsAuthorized(isAuthorized)
       setUserRole(isAuthorized ? role : '')
+      if (isAuthorized) {
+        const { error: profileError } = await ensureMarketplaceUserProfiles(session.user.id)
+        if (cancelled) return
+        setProfileProvisionError(profileError?.message || '')
+      }
       setRoleChecked(true)
       localStorage.setItem(cacheKey, isAuthorized ? role : 'denied')
       if (!isAuthorized) {
@@ -166,6 +192,7 @@ function App() {
     }
 
     checkRole()
+    return () => { cancelled = true }
   }, [session])
 
   useEffect(() => {
@@ -175,7 +202,7 @@ function App() {
         if (!authChecked) {
           return
         }
-        if (currentPath === '/admin') {
+        if (isAdminPage) {
           setLoading(false)
           return
         }
@@ -212,7 +239,7 @@ function App() {
     }
 
     loadCases()
-  }, [authChecked, session, roleChecked, isAuthorized, currentPath])
+  }, [authChecked, session, roleChecked, isAuthorized, isAdminPage])
 
   useEffect(() => {
     const fetchUserIdentity = async () => {
@@ -240,7 +267,7 @@ function App() {
 
   useEffect(() => {
     const fetchMyAgreementsForUser = async () => {
-      if (currentPath === '/admin') {
+      if (isAdminPage) {
         setMyAgreements({})
         return
       }
@@ -265,11 +292,11 @@ function App() {
       setMyAgreements(map)
     }
     fetchMyAgreementsForUser()
-  }, [session, currentPath])
+  }, [session, isAdminPage])
 
   useEffect(() => {
     const loadNotificationPreferences = async () => {
-      if (currentPath === '/admin') {
+      if (isAdminPage) {
         setNotificationPrefs(defaultNotificationPreferences)
         setNotificationDraft(defaultNotificationPreferences)
         setNotificationMessage('')
@@ -281,6 +308,7 @@ function App() {
         setNotificationMessage('')
         return
       }
+      if (!roleChecked || !isAuthorized) return
 
       try {
         const { data, error } = await fetchNotificationPreferences(session.user.id)
@@ -299,7 +327,7 @@ function App() {
     }
 
     loadNotificationPreferences()
-  }, [session, currentPath])
+  }, [session, isAdminPage, roleChecked, isAuthorized])
 
   useEffect(() => {
     const loadStateCodes = async () => {
@@ -318,7 +346,7 @@ function App() {
     [stateCodes],
   )
   const selectedCase = useMemo(
-    () => cases.find((item) => item.id === selectedCaseId),
+    () => cases.find((item) => item.id.replaceAll('-', '') === selectedCaseId?.replaceAll('-', '')),
     [cases, selectedCaseId],
   )
   const resolveStateLabel = useCallback(
@@ -361,7 +389,7 @@ function App() {
 
   useEffect(() => {
     setTablePage(1)
-  }, [search, sort, stateFilter, practiceFilter, view])
+  }, [search, sort, stateFilter, practiceFilter])
 
   const tableCases = useMemo(() => {
     const start = (tablePage - 1) * tablePageSize
@@ -511,6 +539,7 @@ function App() {
 
   const handleSignIn = async (event) => {
     event.preventDefault()
+    if (signInLoading || signInRetrySeconds > 0) return
     setSignInMessage('')
     setSignupMessage('')
     setSignInLoading(true)
@@ -521,7 +550,12 @@ function App() {
     setSignInLoading(false)
 
     if (signInError) {
-      setSignInMessage(signInError.message)
+      const delay = signInError.retryAfterMs || 0
+      setSignInRetryUntil(delay ? Date.now() + delay : 0)
+      setSignInRetrySeconds(Math.ceil(delay / 1000))
+      setSignInMessage(delay
+        ? 'Too many attempts. Please wait before trying again.'
+        : signInError.message)
       return
     }
 
@@ -534,7 +568,6 @@ function App() {
   }
 
   const handleSignOut = async () => {
-    setNavOpen(false)
     setSignInMessage('')
     setSignupMessage('')
     setSignOutLoading(true)
@@ -558,28 +591,11 @@ function App() {
     setNotificationDraft((prev) => ({ ...prev, alertCadence: value }))
   }
 
-  const togglePage = () => {
-    setPage((current) => (current === 'profile' ? 'marketplace' : 'profile'))
-    setNavOpen(false)
-  }
-
   const navigateTo = (path) => {
-    window.history.pushState({}, '', path)
+    window.history.replaceState({ ...window.history.state, scrollY: window.scrollY }, '', window.location.href)
+    window.history.pushState({ scrollY: 0 }, '', path)
     setCurrentPath(path)
-    setNavOpen(false)
-  }
-
-  const handleSwitchToAdminMode = () => {
-    const adminUrl = import.meta.env.VITE_ADMIN_URL
-    if (adminUrl) {
-      window.location.assign(adminUrl)
-      return
-    }
-    navigateTo('/admin')
-  }
-
-  const handleSwitchToMarketplace = () => {
-    navigateTo('/')
+    window.scrollTo(0, 0)
   }
 
   const handleSaveNotificationPreferences = async (event) => {
@@ -601,6 +617,21 @@ function App() {
     } finally {
       setNotificationSaving(false)
     }
+  }
+
+  if (currentPath !== '/apply' && session && !roleChecked) {
+    return <main className="auth-page" role="status">Preparing your marketplace profile…</main>
+  }
+
+  if (currentPath !== '/apply' && profileProvisionError && session && roleChecked && isAuthorized) {
+    return (
+      <main className="auth-page">
+        <div className="auth-message" role="alert">
+          Unable to initialize your marketplace profile: {profileProvisionError}
+        </div>
+        <button className="primary-btn" onClick={() => window.location.reload()}>Retry profile setup</button>
+      </main>
+    )
   }
 
   if (currentPath === '/apply') {
@@ -657,12 +688,14 @@ function App() {
                 placeholder="Your password"
               />
             </label>
-            <button type="submit" disabled={signInLoading}>
-              {signInLoading ? 'Signing in…' : 'Sign in'}
+            <button type="submit" disabled={signInLoading || signInRetrySeconds > 0}>
+              {signInRetrySeconds > 0
+                ? `Try again in ${formatRetryCountdown(signInRetrySeconds)}`
+                : signInLoading ? 'Signing in…' : 'Sign in'}
             </button>
             <small className="auth-hint">Access limited to authorized lawyers.</small>
           </form>
-          {signInMessage && <div className="auth-message">{signInMessage}</div>}
+          {signInMessage && <div className="auth-message" role="status">{signInMessage}</div>}
           <div className="apply-cta">
             <span>Don&apos;t have access, apply now</span>
             <a className="secondary-btn apply-link" href="/apply">
@@ -717,88 +750,80 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="topbar-main">
-          <div className="brand">
-            <div className="brand-name">
-              <img src={tliLogo} alt="TLI logo" className="brand-logo" /> TLI Marketplace
+    <div className="app-shell marketplace-workspace">
+      <a className="workspace-skip" href="#workspace-content">Skip to content</a>
+      <WorkspaceSidebar
+        key={selectedCaseId || 'workspace'} caseId={selectedCaseId}
+        isSettings={page === 'profile'} isAdmin={currentPath === '/admin'}
+        canAdmin={['admin', 'owner'].includes(userRole)} adminUrl={import.meta.env.VITE_ADMIN_URL}
+        navigate={navigateTo} onSignOut={handleSignOut} signingOut={signOutLoading}
+        email={userIdentity.email || session.user.email}
+        filters={!selectedCaseId && page !== 'profile' && !isAdminPage ? (
+          <details className="workspace-filters">
+            <summary>Filter cases{stateFilter.size + practiceFilter.size > 0 ? ` · ${stateFilter.size + practiceFilter.size} active` : ''}</summary>
+          <div className="sidebar-filter-body">
+            <div className="sidebar-filter-controls">
+              <div className="panel-head">
+                <span className="panel-title">Filters</span>
+                <button className="link" onClick={resetFilters}>
+                  Reset
+                </button>
+              </div>
+
+              <div className="filter-group">
+                <div className="group-title">State (license filter)</div>
+                <StateFilter
+                  stateCodes={stateCodes}
+                  fallbackStates={fallbackStates}
+                  value={stateFilter}
+                  onChange={(next) => setStateFilter(new Set(next))}
+                />
+              </div>
+
+              <div className="filter-group">
+                <div className="group-title">Practice area</div>
+                <div className="stack">
+                  {practiceAreas.map((area) => (
+                    <Checkbox
+                      key={area}
+                      label={area}
+                      checked={practiceFilter.has(area)}
+                      onChange={() => togglePractice(area)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="filter-group">
+                <div className="group-title">Sort by</div>
+                <div className="select">
+                  <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                    <option value="created">Date created</option>
+                    <option value="urgency">SOL urgency</option>
+                    <option value="recent">Most recent incident</option>
+                    <option value="value-high">Value high to low</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div className="brand-sub">
-              Dashboard — {userIdentity.displayName || userIdentity.email || 'Guest'}
-            </div>
-            <div className="private-pill">Private lawyer-specific view</div>
+
           </div>
-          <button
-            className="hamburger-btn"
-            type="button"
-            onClick={() => setNavOpen((open) => !open)}
-            aria-label={navOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            aria-expanded={navOpen}
-            aria-controls="topbar-menu"
-          >
-            <span />
-            <span />
-            <span />
-          </button>
-        </div>
-        <div id="topbar-menu" className={`topbar-menu ${navOpen ? 'open' : ''}`}>
-          {currentPath === '/admin' ? (
-            <div className="topbar-title">
-              <span>Admin mode</span>
-              <small>Manage marketplace user roles</small>
-            </div>
-          ) : page === 'marketplace' ? (
-            <div className="search">
-              <SearchIcon />
-              <input
-                type="text"
-                placeholder="Search by case or fact pattern…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          ) : (
-            <div className="topbar-title">
-              <span>Profile settings</span>
-              <small>Notification preferences for new marketplace cases</small>
-            </div>
-          )}
-          <button
-            className={`icon-btn ${page === 'profile' ? 'active' : ''}`}
-            type="button"
-            onClick={currentPath === '/admin' ? handleSwitchToMarketplace : togglePage}
-            aria-label={
-              currentPath === '/admin'
-                ? 'Back to marketplace'
-                : page === 'profile'
-                  ? 'Back to marketplace'
-                  : 'Open profile settings'
-            }
-          >
-            <SettingsIcon />
-            {currentPath === '/admin' || page === 'profile' ? 'Marketplace' : 'Settings'}
-          </button>
-          {['admin', 'owner'].includes(userRole) && currentPath !== '/admin' && (
-            <button
-              className="icon-btn admin-switch-btn"
-              type="button"
-              onClick={handleSwitchToAdminMode}
-              aria-label="Switch to admin mode"
-            >
-              <AdminIcon />
-              Switch to admin mode
-            </button>
-          )}
-          <button className="icon-btn" type="button" aria-label="Saved cases">
-            <BookmarkIcon />
-            Saved
-          </button>
-          <button className="icon-btn" type="button" onClick={handleSignOut} disabled={signOutLoading}>
-            {signOutLoading ? 'Signing out…' : 'Sign out'}
-          </button>
-        </div>
-      </header>
+          </details>
+        ) : null}
+      />
+      <div className="workspace-main" id="workspace-content">
+        {!selectedCaseId && <header className="workspace-heading">
+          <div>
+            <p className="eyebrow">Lawyer workspace</p>
+            <h1>{currentPath === '/admin' ? 'Administration' : page === 'profile' ? 'Profile & alerts' : 'Marketplace cases'}</h1>
+            <p>{page === 'profile' ? 'Manage your new-case notifications.' : currentPath === '/admin' ? 'Manage users and case submissions.' : 'Review the facts, explore supporting documents, and find cases to pursue.'}</p>
+          </div>
+          {currentPath !== '/admin' && page === 'marketplace' && <label className="workspace-search">
+            <SearchIcon /><span className="sr-only">Search cases</span>
+            <input type="search" placeholder="Search cases or fact patterns…" value={search} onChange={event => setSearch(event.target.value)} />
+          </label>}
+        </header>}
+
 
       {currentPath === '/admin' ? (
         ['admin', 'owner'].includes(userRole) ? (
@@ -811,6 +836,18 @@ function App() {
             </section>
           </main>
         )
+      ) : selectedCaseId ? (
+        selectedCase ? <CaseDetail
+          key={selectedCase.id} data={selectedCase}
+          onClose={() => window.history.state?.fromCaseList ? window.history.back() : navigateTo('/')}
+          onSubmitAgreement={handleSubmitAgreement}
+          existingAgreement={myAgreements[selectedCase.id]}
+          agreementState={agreementState[selectedCase.id] || { loading: false, message: '' }}
+        /> : <main className="workspace-empty" role="status">
+          <h1>{loading ? 'Loading case…' : error ? 'Unable to load case' : 'Case unavailable'}</h1>
+          <p>{loading ? 'Loading the intake and supporting documents.' : error || 'This case may have been removed or is not available to your account.'}</p>
+          <a href="/" onClick={event => { event.preventDefault(); navigateTo('/') }}>Back to cases</a>
+        </main>
       ) : page === 'profile' ? (
         <main className="profile-page">
           <section className="profile-card">
@@ -906,79 +943,9 @@ function App() {
         </main>
       ) : (
         <main className="page">
-          <aside className="sidebar">
-            <div className="panel">
-              <div className="panel-head">
-                <span className="panel-title">Filters</span>
-                <button className="link" onClick={resetFilters}>
-                  Reset
-                </button>
-              </div>
 
-              <div className="filter-group">
-                <div className="group-title">State (license filter)</div>
-                <StateFilter
-                  stateCodes={stateCodes}
-                  fallbackStates={fallbackStates}
-                  value={stateFilter}
-                  onChange={(next) => setStateFilter(new Set(next))}
-                />
-              </div>
-
-              <div className="filter-group">
-                <div className="group-title">Practice area</div>
-                <div className="stack">
-                  {practiceAreas.map((area) => (
-                    <Checkbox
-                      key={area}
-                      label={area}
-                      checked={practiceFilter.has(area)}
-                      onChange={() => togglePractice(area)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="filter-group">
-                <div className="group-title">Sort by</div>
-                <div className="select">
-                  <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                    <option value="created">Date created</option>
-                    <option value="urgency">SOL urgency</option>
-                    <option value="recent">Most recent incident</option>
-                    <option value="value-high">Value high to low</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="panel notice">
-              <div className="notice-title">Compliance First</div>
-              <p>
-                Viewing gated to state licensure. Contact requires user consent and disclosures per Rules 7.2/7.3; platform logs
-                all outreach.
-              </p>
-            </div>
-          </aside>
 
           <section className="content">
-            <div className="content-head">
-              {!loading && (
-                <div className="results">
-                  <span className="count">{filtered.length}</span>
-                  <span className="label">results</span>
-                </div>
-              )}
-              <div className="view-toggle">
-                <button className={view === 'table' ? 'active' : ''} onClick={() => setView('table')}>
-                  Table
-                </button>
-                <button className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}>
-                  Grid
-                </button>
-              </div>
-            </div>
-
             {loading && <div className="panel">Loading cases…</div>}
             {error && (
               <div className="panel notice">
@@ -987,42 +954,20 @@ function App() {
               </div>
             )}
             {!loading && !error && (
-              view === 'table' ? (
-                <CaseTable
-                  cases={tableCases}
-                  page={tablePage}
-                  pageSize={tablePageSize}
-                  totalCount={filtered.length}
-                  onPageChange={handleTablePageChange}
-                  onOpen={(id) => setSelectedCaseId(id)}
-                />
-              ) : (
-                <div className={`cases ${view}`}>
-                  {filtered.map((item) => (
-                    <CaseCard
-                      key={item.id}
-                      data={item}
-                      view={view}
-                      agreementInfo={myAgreements[item.id]}
-                      onOpen={(id) => setSelectedCaseId(id)}
-                    />
-                  ))}
-                </div>
-              )
+              <CaseTable
+                cases={tableCases}
+                page={tablePage}
+                pageSize={tablePageSize}
+                totalCount={filtered.length}
+                onPageChange={handleTablePageChange}
+                onOpen={(id) => { navigateTo(`/cases/${id}`); window.history.replaceState({ ...window.history.state, fromCaseList: true }, '', window.location.href) }}
+              />
             )}
           </section>
         </main>
       )}
 
-      {selectedCase && (
-        <CaseDetail
-          data={selectedCase}
-          onClose={() => setSelectedCaseId(null)}
-          onSubmitAgreement={handleSubmitAgreement}
-          existingAgreement={myAgreements[selectedCase.id]}
-          agreementState={agreementState[selectedCase.id] || { loading: false, message: '' }}
-        />
-      )}
+      </div>
     </div>
   )
 }
@@ -1036,31 +981,5 @@ const SearchIcon = () => (
   </svg>
 )
 
-const BookmarkIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      fill="currentColor"
-      d="M6 3h12v18l-6-3-6 3V3Zm2 2v11.56l4-2 4 2V5H8Z"
-    />
-  </svg>
-)
-
-const SettingsIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      fill="currentColor"
-      d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm7.43 2.98c.04-.32.07-.65.07-.98s-.03-.66-.07-.98l2.08-1.62-2-3.46-2.45.98a7.34 7.34 0 0 0-1.7-.99L15 3.31h-4l-.36 2.62c-.6.24-1.17.57-1.7.99l-2.45-.98-2 3.46 2.08 1.62c-.04.32-.07.65-.07.98s.03.66.07.98L4.49 14.6l2 3.46 2.45-.98c.53.42 1.1.75 1.7.99L11 20.69h4l.36-2.62c.6-.24 1.17-.57 1.7-.99l2.45.98 2-3.46-2.08-1.62Zm-1.96-1.46.12.5-.12.5-.19.76 1.62 1.26-.34.58-1.91-.76-.61.49c-.38.3-.8.55-1.24.73l-.73.3-.28 2.04h-.68l-.28-2.04-.73-.3c-.44-.18-.86-.43-1.24-.73l-.61-.49-1.91.76-.34-.58 1.62-1.26-.19-.76a4.1 4.1 0 0 1-.12-.5c0-.16.04-.34.12-.5l.19-.76-1.62-1.26.34-.58 1.91.76.61-.49c.38-.3.8-.55 1.24-.73l.73-.3.28-2.04h.68l.28 2.04.73.3c.44.18.86.43 1.24.73l.61.49 1.91-.76.34.58-1.62 1.26.19.76Z"
-    />
-  </svg>
-)
-
-const AdminIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      fill="currentColor"
-      d="M12 2 4 5.2v5.9c0 5.05 3.42 9.77 8 10.9 4.58-1.13 8-5.85 8-10.9V5.2L12 2Zm0 2.15 6 2.4v4.55c0 4.02-2.48 7.72-6 8.83-3.52-1.11-6-4.81-6-8.83V6.55l6-2.4Zm0 3.35a2.75 2.75 0 0 0-1 5.31v2.69h2v-2.69a2.75 2.75 0 0 0-1-5.31Zm0 2a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Z"
-    />
-  </svg>
-)
 
 export default App

@@ -18,6 +18,7 @@ type StateCode @table(key: ["code"]) {
 
 type UserProfile @table(key: ["userId"]) {
   userId: String! @default(expr: "auth.uid")
+  # Legacy reporting mirror of Auth claims; never use this field for authorization.
   role: String!
   fullName: String
   phone: String
@@ -187,6 +188,7 @@ enum ContactMethod {
 }
 
 enum AlertTimeframe {
+  IMMEDIATE
   DAILY
   WEEKLY
 }

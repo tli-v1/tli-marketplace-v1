@@ -8,7 +8,12 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:integration:application": "node test/integration/lawFirmApplication.integration.mjs"
+    "test:profiles": "node --test test/unit/notificationPreferences.test.mjs",
+    "test:integration:profiles": "firebase emulators:exec --only dataconnect --project peak-bit-486121-n6 'node test/integration/marketplaceProfiles.integration.mjs'",
+    "test:integration:application": "node test/integration/lawFirmApplication.integration.mjs",
+    "test:integration:intake": "firebase emulators:exec --config firebase.integration.json --only auth,firestore,dataconnect --project peak-bit-486121-n6 \"node --test --test-force-exit test/integration/intakeEmail.integration.mjs\"",
+    "test:intake:email": "RUN_LIVE_INTAKE_EMAIL=1 node --env-file-if-exists=.env.test.local --test --test-force-exit test/integration/intakeEmail.integration.mjs",
+    "test:notifications": "node --test test/unit/caseIds.test.mjs"
   },
   "dependencies": {
     "@dataconnect/generated": "file:src/dataconnect-generated",
@@ -26,6 +31,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "smtp-server": "^3.21.1",
     "vite": "^7.2.2"
   }
 }

@@ -1,14 +1,47 @@
+# Idempotent sign-in provisioning. Auth claims are authoritative; the SQL role
+# is a compatibility/reporting mirror and never grants marketplace access.
+mutation EnsureMarketplaceProfiles(
+  $emailNewCases: Boolean! = false
+  $smsNewCases: Boolean! = false
+  $alertTimeframe: AlertTimeframe! = DAILY
+) @auth(expr: "auth.token.role in ['lawyer', 'admin', 'owner'] || auth.token.admin == true || auth.token.owner == true") @transaction {
+  query @redact {
+    userProfile(key: { userId_expr: "auth.uid" }) { createdAt }
+    lawyerUserProfile(key: { lawyerId_expr: "auth.uid" }) {
+      emailNewCases
+      smsNewCases
+      alertTimeframe
+      createdAt
+      updatedAt
+    }
+  }
+  userProfile_upsert(data: {
+    userId_expr: "auth.uid"
+    role_expr: "('owner' in auth.token && auth.token.owner == true) || ('role' in auth.token && auth.token.role == 'owner') ? 'owner' : (('admin' in auth.token && auth.token.admin == true) || ('role' in auth.token && auth.token.role == 'admin') ? 'admin' : ('role' in auth.token ? auth.token.role : 'user'))"
+    createdAt_expr: "response.query.userProfile != null ? response.query.userProfile.createdAt : request.time"
+    updatedAt_expr: "request.time"
+  })
+  lawyerUserProfile_upsert(data: {
+    lawyerId_expr: "auth.uid"
+    emailNewCases_expr: "response.query.lawyerUserProfile != null ? response.query.lawyerUserProfile.emailNewCases : vars.emailNewCases"
+    smsNewCases_expr: "response.query.lawyerUserProfile != null ? response.query.lawyerUserProfile.smsNewCases : vars.smsNewCases"
+    alertTimeframe_expr: "response.query.lawyerUserProfile != null ? response.query.lawyerUserProfile.alertTimeframe : vars.alertTimeframe"
+    createdAt_expr: "response.query.lawyerUserProfile != null ? response.query.lawyerUserProfile.createdAt : request.time"
+    updatedAt_expr: "response.query.lawyerUserProfile != null ? response.query.lawyerUserProfile.updatedAt : request.time"
+  })
+}
+
 mutation EnsureUserProfile(
+  $role: String @retired
   $fullName: String
   $phone: String
-  $role: String!
 ) @auth(level: USER) {
   userProfile_upsert(
     data: {
       userId_expr: "auth.uid"
       fullName: $fullName
       phone: $phone
-      role: $role
+      role_expr: "('owner' in auth.token && auth.token.owner == true) || ('role' in auth.token && auth.token.role == 'owner') ? 'owner' : (('admin' in auth.token && auth.token.admin == true) || ('role' in auth.token && auth.token.role == 'admin') ? 'admin' : ('role' in auth.token ? auth.token.role : 'user'))"
       createdAt_expr: "request.time"
       updatedAt_expr: "request.time"
     }
@@ -19,7 +52,7 @@ mutation UpsertLawyerUserProfile(
   $emailNewCases: Boolean!
   $smsNewCases: Boolean!
   $alertTimeframe: AlertTimeframe!
-) @auth(expr: "auth.token.role == 'lawyer'") {
+) @auth(expr: "auth.token.role in ['lawyer', 'admin', 'owner'] || auth.token.admin == true || auth.token.owner == true") {
   lawyerUserProfile_upsert(
     data: {
       lawyerId_expr: "auth.uid"
@@ -514,7 +547,7 @@ mutation CreateLawyerClientAgreement(
   $publicUrl: String
   $contentType: String
   $fileSize: Int
-) @auth(expr: "auth.token.role == 'lawyer'") @transaction {
+) @auth(expr: "auth.token.role in ['lawyer', 'admin', 'owner'] || auth.token.admin == true || auth.token.owner == true") @transaction {
   query @redact {
     case(key: { id: $caseId }) @check(expr: "this != null", message: "Case not found") {
       id

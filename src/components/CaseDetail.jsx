@@ -98,17 +98,24 @@ const CaseDetail = ({
   }
 
   return (
-    <div className="case-modal-backdrop" onClick={onClose}>
-      <div className="case-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="close-btn" type="button" onClick={onClose} aria-label="Close case details">
-          ×
-        </button>
-
+    <main className="case-review">
+      <a className="case-back" href="/" onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onClose() } }}>← Back to cases</a>
+      <header className="case-review-header">
+        <div><p className="eyebrow">Case review · {locationLabel}</p><h1>{data.title || 'Case details'}</h1><p>Review the intake and supporting evidence before sharing an agreement.</p></div>
+      </header>
+      <dl className="case-review-summary">
+        <div><dt>Reported financial losses</dt><dd>{data.valueRange}</dd></div>
+        <div><dt>Incident date</dt><dd>{formatDate(data.incident.date)}</dd></div>
+        <div><dt>Supporting files</dt><dd>{documents.length}</dd></div>
+        <div><dt>Your agreement</dt><dd>{existingAgreement?.files?.length ? 'Uploaded' : 'Not uploaded'}</dd></div>
+      </dl>
+      <p className="case-review-note">Amounts are reported by the client and have not been independently verified.</p>
+      <div className="case-review-body">
         <div className="detail-grid">
           <div className="detail-column">
-            <section className="detail-section">
+            <section className="detail-section" id="incident">
               <div className="section-head">
-                <h4>Incident details</h4>
+                <h2>Incident details</h2>
                 <span className="section-sub">{locationLabel}</span>
               </div>
               <p className="section-body">{data.incident.description || 'No incident narrative provided.'}</p>
@@ -122,13 +129,13 @@ const CaseDetail = ({
                 <DetailMeta label="Email" value={data.caseContact.email} />
                 <DetailMeta label="Phone" value={data.caseContact.phone} />
                 <DetailMeta label="Documents" value={`${documents.length}`} />
-                <DetailMeta label="Value range" value={data.valueRange} />
+                <DetailMeta label="Reported losses" value={data.valueRange} />
               </div>
             </section>
 
-            <section className="detail-section">
+            <section className="detail-section" id="parties">
               <div className="section-head">
-                <h4>Parties</h4>
+                <h2>Parties</h2>
                 <span className="section-sub">Plaintiff / defendant / insurer</span>
               </div>
               {parties.length === 0 ? (
@@ -155,9 +162,9 @@ const CaseDetail = ({
           </div>
 
           <div className="detail-column">
-            <section className="detail-section">
+            <section className="detail-section" id="damages">
               <div className="section-head">
-                <h4>Damages</h4>
+                <h2>Damages</h2>
                 <span className="section-sub">Financial snapshot</span>
               </div>
               <div className="detail-list two-col">
@@ -178,7 +185,8 @@ const CaseDetail = ({
             </section>
 
             {onSubmitAgreement && (
-              <section className="detail-section agreement-section">
+              <section className="detail-section agreement-section" id="agreement">
+                <div className="section-head"><h2>Lawyer-client agreement</h2></div>
                 <LawyerClientAgreement
                   caseId={data.id}
                   existingAgreement={existingAgreement}
@@ -189,9 +197,9 @@ const CaseDetail = ({
             )}
           </div>
 
-          <section className="detail-section full">
+          <section className="detail-section full" id="documents">
             <div className="section-head">
-              <h4>Files & Evidence</h4>
+              <h2>Files & Evidence</h2>
               <span className="section-sub">
                 {documents.length} file
                 {documents.length === 1 ? '' : 's'}
@@ -228,7 +236,7 @@ const CaseDetail = ({
           </section>
         </div>
       </div>
-    </div>
+    </main>
   )
 }
 

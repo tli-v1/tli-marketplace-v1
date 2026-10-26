@@ -1,11 +1,16 @@
+import { sendEmailNotification } from './email.js'
+import { normalizeCaseId } from './caseIds.js'
 import { initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
+import { defineSecret } from 'firebase-functions/params'
 
 initializeApp()
+
+const notificationSecrets = [defineSecret('GMAIL_APP_PASSWORD')]
 
 const auth = getAuth()
 const firestore = getFirestore()
@@ -21,6 +26,7 @@ const DELETABLE_STORAGE_PREFIXES = [
 ]
 const NOTIFICATION_EVENTS_COLLECTION = 'marketplace_case_notification_events'
 const NOTIFICATION_DELIVERIES_COLLECTION = 'marketplace_notification_deliveries'
+const CONVERSATIONAL_INTAKES_COLLECTION = 'conversationalIntakes'
 const NOTIFICATION_LOOKBACK_DAYS = {
   daily: 1,
   weekly: 7,
@@ -105,15 +111,22 @@ const normalizeString = (value, maxLength = 500) => {
   return value.trim().slice(0, maxLength)
 }
 
+const serializeFirestoreValue = (value) => {
+  if (value?.toDate) return value.toDate().toISOString()
+  if (value instanceof Date) return value.toISOString()
+  if (Array.isArray(value)) return value.map(serializeFirestoreValue)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serializeFirestoreValue(item)]))
+  }
+  return value ?? null
+}
+
 const requireSignedIn = (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in before creating marketplace notifications.')
   }
   return request.auth.uid
 }
-
-const isUuidLike = (value) =>
-  typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 
 const getPeriodKey = (cadence, now = new Date()) => {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -153,35 +166,124 @@ const buildNotificationText = ({ cadence, cases }) => {
   return `${headline}\n\n${cases.length} new marketplace case(s):\n${lines.join('\n')}${extra}\n\nSign in to review: https://www.marketplace.truelegalinnovations.com`
 }
 
-const getDeliveryId = ({ cadence, channel, periodKey, lawyerId }) => `${cadence}_${periodKey}_${lawyerId}_${channel}`
-
-const sendEmailNotification = async ({ to, subject, text }) => {
-  const apiKey = process.env.SENDGRID_API_KEY
-  const from = process.env.SENDGRID_FROM_EMAIL
-  if (!apiKey || !from) {
-    return { status: 'missing_provider', provider: 'sendgrid' }
+const firstPresent = (source, keys) => {
+  for (const key of keys) {
+    if (source?.[key] !== undefined && source?.[key] !== null && source?.[key] !== '') {
+      return source[key]
+    }
   }
-
-  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      personalizations: [{ to: [{ email: to }] }],
-      from: { email: from },
-      subject,
-      content: [{ type: 'text/plain', value: text }],
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`SendGrid failed with ${response.status}: ${await response.text()}`)
-  }
-
-  return { status: 'sent', provider: 'sendgrid' }
+  return null
 }
+
+const toIsoDate = (value) => {
+  if (!value) return ''
+  if (value?.toDate) return value.toDate().toISOString()
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value === 'number') {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString()
+  }
+  if (typeof value === 'string') {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? value : date.toISOString()
+  }
+  return ''
+}
+
+const normalizeConversationMessages = (data) => {
+  const source = firstPresent(data, ['messages', 'conversation', 'transcript', 'chat', 'turns', 'history'])
+  if (!Array.isArray(source)) return []
+
+  return source.slice(-80).map((message, index) => {
+    if (typeof message === 'string') {
+      return { index, role: '', content: message, createdAt: '' }
+    }
+
+    if (!message || typeof message !== 'object') {
+      return { index, role: '', content: String(message ?? ''), createdAt: '' }
+    }
+
+    return {
+      index,
+      role: normalizeString(firstPresent(message, ['role', 'speaker', 'author', 'sender', 'type']) || '', 40),
+      content: normalizeString(firstPresent(message, ['content', 'text', 'message', 'body', 'answer', 'value']) || '', 5000),
+      createdAt: toIsoDate(firstPresent(message, ['created_at', 'createdAt', 'timestamp', 'time', 'sentAt'])),
+    }
+  })
+}
+
+const deriveIntakeStatus = (data) => {
+  const rawStatus = normalizeString(firstPresent(data, ['status', 'state', 'stage', 'conversationStatus']) || '', 80)
+  const lowerStatus = rawStatus.toLowerCase()
+  const completed = Boolean(
+    data.completed === true
+      || data.isComplete === true
+      || data.submitted === true
+      || data.leadCreated === true
+      || firstPresent(data, ['completed_at', 'completedAt', 'submitted_at', 'submittedAt', 'lead_id', 'leadId', 'case_id', 'caseId'])
+      || ['complete', 'completed', 'submitted', 'converted', 'lead_created', 'case_created'].includes(lowerStatus),
+  )
+
+  return {
+    status: rawStatus || (completed ? 'completed' : 'incomplete'),
+    completed,
+  }
+}
+
+const serializeConversationalIntake = (doc) => {
+  const data = doc.data() || {}
+  const createdAt = toIsoDate(firstPresent(data, ['created_at', 'createdAt', 'started_at', 'startedAt', 'created']))
+  const updatedAt = toIsoDate(firstPresent(data, ['updated_at', 'updatedAt', 'last_message_at', 'lastMessageAt', 'lastSeenAt']))
+  const completedAt = toIsoDate(firstPresent(data, ['completed_at', 'completedAt', 'submitted_at', 'submittedAt']))
+  const timestamp = updatedAt || completedAt || createdAt
+  const messages = normalizeConversationMessages(data)
+  const { status, completed } = deriveIntakeStatus(data)
+
+  return {
+    id: doc.id,
+    createdAt,
+    updatedAt,
+    completedAt,
+    timestamp,
+    status,
+    completed,
+    currentStep: normalizeString(firstPresent(data, ['current_step', 'currentStep', 'step', 'questionKey', 'lastQuestion']) || '', 160),
+    failureReason: normalizeString(firstPresent(data, ['failure_reason', 'failureReason', 'error', 'errorMessage', 'dropoffReason']) || '', 500),
+    contactName: normalizeString(firstPresent(data, ['full_name', 'fullName', 'name', 'contactName']) || '', 160),
+    contactEmail: normalizeString(firstPresent(data, ['email', 'contactEmail']) || '', 180),
+    contactPhone: normalizeString(firstPresent(data, ['phone', 'contactPhone']) || '', 80),
+    caseId: normalizeString(firstPresent(data, ['case_id', 'caseId']) || '', 100),
+    leadId: normalizeString(firstPresent(data, ['lead_id', 'leadId']) || '', 100),
+    messageCount: messages.length,
+    messages,
+    raw: serializeFirestoreValue(data),
+  }
+}
+
+const fetchConversationalIntakeDocs = async (limit) => {
+  const collectionRef = firestore.collection(CONVERSATIONAL_INTAKES_COLLECTION)
+  const orderFields = ['updated_at', 'updatedAt', 'created_at', 'createdAt', 'lastMessageAt']
+  const docsById = new Map()
+
+  for (const field of orderFields) {
+    try {
+      const snapshot = await collectionRef.orderBy(field, 'desc').limit(limit).get()
+      snapshot.docs.forEach((doc) => docsById.set(doc.id, doc))
+      if (docsById.size >= limit) break
+    } catch (error) {
+      console.warn(`Failed to order conversational intakes by ${field}`, error)
+    }
+  }
+
+  if (!docsById.size) {
+    const snapshot = await collectionRef.limit(limit).get()
+    snapshot.docs.forEach((doc) => docsById.set(doc.id, doc))
+  }
+
+  return [...docsById.values()].slice(0, limit)
+}
+
+const getDeliveryId = ({ cadence, channel, periodKey, lawyerId }) => `${cadence}_${periodKey}_${lawyerId}_${channel}`
 
 const sendSmsNotification = async ({ to, text }) => {
   const accountSid = process.env.TWILIO_ACCOUNT_SID
@@ -255,7 +357,7 @@ const deliveryAlreadyHandled = async ({ cadence, channel, periodKey, lawyerId })
     .collection(NOTIFICATION_DELIVERIES_COLLECTION)
     .doc(getDeliveryId({ cadence, channel, periodKey, lawyerId }))
     .get()
-  return ['sent', 'missing_provider', 'missing_destination'].includes(delivery.data()?.status)
+  return delivery.data()?.status === 'sent'
 }
 
 const notifyProfile = async ({ profile, cadence, periodKey, cases, emailOnly = false }) => {
@@ -302,7 +404,7 @@ const notifyProfile = async ({ profile, cadence, periodKey, cases, emailOnly = f
         lawyerId: profile.lawyerId,
         caseIds,
         status: 'failed',
-        provider: 'sendgrid',
+        provider: 'gmail-smtp',
         error: error?.message || 'Email send failed.',
       })
     }
@@ -498,11 +600,30 @@ export const deleteCaseStorageFiles = onCall({ region: 'us-central1' }, async (r
   return { deletedCount: normalizedPaths.length, deletedPaths: normalizedPaths }
 })
 
-export const enqueueMarketplaceCaseNotification = onCall({ region: 'us-central1' }, async (request) => {
+export const listConversationalIntakes = onCall({ region: 'us-central1' }, async (request) => {
+  requireAdmin(request)
+
+  const requestedLimit = Number(request.data?.limit || 250)
+  const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 250, 25), 500)
+
+  try {
+    const docs = await fetchConversationalIntakeDocs(limit)
+    const intakes = docs
+      .map(serializeConversationalIntake)
+      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+
+    return { intakes }
+  } catch (error) {
+    console.error('Failed to list conversational intakes', error)
+    throw new HttpsError('internal', 'Failed to load conversational intakes.')
+  }
+})
+
+export const enqueueMarketplaceCaseNotification = onCall({ region: 'us-central1', secrets: notificationSecrets }, async (request) => {
   const uid = requireSignedIn(request)
 
-  const caseId = normalizeString(request.data?.caseId, 80)
-  if (!isUuidLike(caseId)) {
+  const caseId = normalizeCaseId(request.data?.caseId)
+  if (!caseId) {
     throw new HttpsError('invalid-argument', 'Provide a valid case id.')
   }
 
@@ -532,6 +653,7 @@ export const enqueueMarketplaceCaseNotification = onCall({ region: 'us-central1'
 export const processDailyMarketplaceNotifications = onSchedule(
   {
     region: 'us-central1',
+    secrets: notificationSecrets,
     schedule: '0 9 * * *',
     timeZone: 'America/New_York',
   },
@@ -541,6 +663,7 @@ export const processDailyMarketplaceNotifications = onSchedule(
 export const processWeeklyMarketplaceNotifications = onSchedule(
   {
     region: 'us-central1',
+    secrets: notificationSecrets,
     schedule: '0 9 * * MON',
     timeZone: 'America/New_York',
   },

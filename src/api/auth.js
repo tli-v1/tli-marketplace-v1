@@ -5,25 +5,7 @@ import {
   signOut as firebaseSignOut,
 } from 'firebase/auth'
 import { auth } from '../firebase'
-
-const INVALID_CREDENTIAL_CODES = new Set([
-  'auth/invalid-credential',
-  'auth/invalid-email',
-  'auth/user-not-found',
-  'auth/wrong-password',
-])
-
-const toAuthError = (error, fallbackMessage = 'Authentication failed') => ({
-  message: error?.message || fallbackMessage,
-  code: error?.code,
-})
-
-const toSignInError = (error) => ({
-  message: INVALID_CREDENTIAL_CODES.has(error?.code)
-    ? 'Invalid username or password'
-    : error?.message || 'Invalid username or password',
-  code: error?.code,
-})
+import { toAuthError, toSignInError } from './authErrors'
 
 const toUser = (user) => {
   if (!user) return null

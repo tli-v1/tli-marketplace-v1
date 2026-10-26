@@ -24,6 +24,10 @@ const CaseTable = ({ cases, page, pageSize, totalCount, onPageChange, onOpen }) 
 
   return (
     <div className="case-table-shell">
+      <header className="case-table-heading">
+        <h2>Cases</h2>
+        <span className="case-table-total" role="status">{totalCount.toLocaleString()} {totalCount === 1 ? 'case' : 'cases'}</span>
+      </header>
       <div className="case-table-wrap">
         <table className="case-table">
           <thead>
@@ -60,16 +64,19 @@ const CaseTable = ({ cases, page, pageSize, totalCount, onPageChange, onOpen }) 
                     <span className="doc-count">{docs}</span>
                   </td>
                   <td className="action-cell">
-                    <button
-                      type="button"
+                    <a
+                      href={`/cases/${item.id}`}
                       className="secondary-btn"
+                      aria-label={`Review case: ${item.title || description.slice(0, 80)}`}
                       onClick={(event) => {
                         event.stopPropagation()
+                        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                        event.preventDefault()
                         onOpen?.(item.id)
                       }}
                     >
-                      View
-                    </button>
+                      Review case
+                    </a>
                   </td>
                 </tr>
               )

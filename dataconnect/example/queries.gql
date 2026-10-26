@@ -118,7 +118,7 @@ query GetUserProfile @auth(level: USER) {
   }
 }
 
-query GetLawyerUserProfile @auth(expr: "auth.token.role == 'lawyer'") {
+query GetLawyerUserProfile @auth(expr: "auth.token.role in ['lawyer', 'admin', 'owner'] || auth.token.admin == true || auth.token.owner == true") {
   lawyerUserProfile(key: { lawyerId_expr: "auth.uid" }) {
     lawyerId
     emailNewCases
@@ -136,7 +136,7 @@ query GetStateCodes @auth(level: PUBLIC, insecureReason: "State codes are public
   }
 }
 
-query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
+query GetLawyerCases @auth(expr: "auth.token.role in ['lawyer', 'admin', 'owner'] || auth.token.admin == true || auth.token.owner == true") {
   cases(orderBy: [{ createdAt: DESC }, { id: DESC }]) {
     id
     userId
@@ -218,7 +218,7 @@ query GetLawyerCases @auth(expr: "auth.token.role == 'lawyer'") {
   }
 }
 
-query GetMyAgreements @auth(expr: "auth.token.role == 'lawyer'") {
+query GetMyAgreements @auth(expr: "auth.token.role in ['lawyer', 'admin', 'owner'] || auth.token.admin == true || auth.token.owner == true") {
   lawyerClientAgreements(
     where: { lawyerId: { eq_expr: "auth.uid" } }
     orderBy: [{ createdAt: DESC }]

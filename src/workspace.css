@@ -1,0 +1,155 @@
+/* Navigation and workspace surfaces shared with tli-web-v1's dashboard. */
+.marketplace-workspace {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+  min-height: 100dvh;
+  background: #f4f7fd;
+  color: #19315e;
+}
+.workspace-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100dvh;
+  overflow-y: auto;
+  padding: 24px 12px;
+  background: #1a2f5f;
+  color: #d6e1f5;
+}
+.workspace-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px 24px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.workspace-brand img { width: 34px; height: auto; }
+.workspace-caption { padding: 12px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #aebfdf; }
+.workspace-sidebar nav { display: grid; gap: 8px; }
+.workspace-sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px;
+  border-radius: 10px;
+  color: #d6e1f5;
+  font-size: 14px;
+}
+.workspace-sidebar nav a[aria-current] { background: #36578f; color: #fff; box-shadow: inset 3px 0 #f4b400; }
+.workspace-sidebar nav a:hover { background: #2e4b7c; color: #fff; }
+.workspace-sidebar svg { width: 20px; height: 20px; flex-shrink: 0; }
+.workspace-sidebar :focus-visible { outline: 2px solid #f4b400; outline-offset: -3px; }
+.workspace-case-nav { display: grid; margin-top: 20px; border-top: 1px solid #ffffff2e; }
+.workspace-case-nav nav a { font-size: 13px; }
+.workspace-account { margin: auto -12px 0; padding-top: 24px; }
+.workspace-account > span { display: block; padding: 12px 16px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.workspace-account button {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  padding: 12px 16px; border: 0; border-top: 1px solid #ffffff2e; border-radius: 0;
+  background: transparent; color: #d6e1f5; box-shadow: none; cursor: pointer;
+}
+.workspace-account button:hover { background: #294477; color: #fff; }
+.workspace-main { min-width: 0; padding: clamp(24px, 3vw, 48px); }
+.workspace-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 28px; }
+.workspace-heading h1 { margin: 0 0 10px; font-size: clamp(26px, 3vw, 36px); font-weight: 400; letter-spacing: -.025em; }
+.workspace-heading p { margin: 0; color: #536580; max-width: 620px; }
+.workspace-heading .eyebrow { margin-bottom: 8px; font-size: 11px; }
+.workspace-search { display: flex; align-items: center; gap: 10px; width: min(340px, 100%); flex-shrink: 0; border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; padding: 12px; }
+.workspace-search input { min-width: 0; width: 100%; border: none; background: transparent; color: #19315e; }
+.marketplace-workspace .page { display: block; padding: 0; max-width: none; }
+.workspace-filters { width: 100%; margin-top: 20px; border-top: 1px solid #ffffff2e; padding-top: 12px; }
+.workspace-filters summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; list-style: none; min-height: 44px; padding: 12px; border-radius: 10px; color: #d6e1f5; cursor: pointer; font-size: 14px; }
+.workspace-filters summary::-webkit-details-marker { display: none; }
+.workspace-filters summary::after { content: ''; width: 8px; height: 8px; flex-shrink: 0; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin: -4px 3px 0 0; }
+.workspace-filters[open] summary::after { transform: rotate(225deg); margin-top: 4px; }
+.workspace-filters summary:hover { background: #2e4b7c; }
+.workspace-filters[open] summary { margin-bottom: 12px; background: #294477; }
+.sidebar-filter-body { min-width: 0; padding: 0 6px 16px; }
+.sidebar-filter-controls .panel-title { color: #fff; font-size: 13px; }
+.sidebar-filter-controls .link { color: #d6e1f5; text-decoration: underline; font-size: 12px; }
+.sidebar-filter-controls .group-title { color: #fff; font-size: 12px; }
+.sidebar-filter-controls .filter-group { border-color: #ffffff2e; }
+.sidebar-filter-controls .checkbox { width: 100%; padding: 7px 4px; font-size: 12px; align-items: start; }
+.sidebar-filter-controls .checkbox input { flex-shrink: 0; margin-top: 3px; accent-color: #f4b400; }
+.sidebar-filter-controls .checkbox:hover { background: #294477; }
+.sidebar-filter-controls .state-typeahead { grid-template-columns: minmax(0, 1fr); }
+.sidebar-filter-controls .state-typeahead input, .sidebar-filter-controls select { min-width: 0; max-width: 100%; padding: 10px; color: #19315e; font-size: 12px; }
+.sidebar-filter-controls .state-typeahead button { padding: 8px; border-color: #ffffff33; background: #36578f; font-size: 12px; }
+.sidebar-filter-controls .filter-hint { color: #b8c9e5; font-size: 11px; }
+.sidebar-filter-controls .chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.marketplace-workspace .content { min-width: 0; padding: 0; border: 0; background: transparent; }
+.case-table-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.case-table-heading h2 { margin: 0; color: #19315e; font-size: 20px; font-weight: 500; }
+.case-table-total { color: #536580; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.marketplace-workspace .case-table-shell, .marketplace-workspace .case-table-wrap { box-shadow: none; }
+.marketplace-workspace .case-table { min-width: 700px; }
+.marketplace-workspace .case-table th { background: #edf3fc; }
+.marketplace-workspace .case-table th:last-child, .marketplace-workspace .case-table td:last-child { width: 140px; }
+.marketplace-workspace .case-table .secondary-btn { white-space: nowrap; font-size: 12px; padding: 8px 12px; }
+.marketplace-workspace .table-pagination { flex-wrap: wrap; gap: 12px; }
+.marketplace-workspace .profile-page, .marketplace-workspace .admin-page { width: 100%; padding: 0; max-width: none; }
+.workspace-empty { padding: 48px 0; }
+.workspace-empty h1 { font-weight: 500; }
+.workspace-skip, .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.workspace-skip:focus { position: fixed; top: 12px; left: 12px; z-index: 100; width: auto; height: auto; padding: 12px 20px; clip-path: none; background: #fff; color: #19315e; border-radius: 8px; }
+.case-back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 12px; color: #536580; font-size: 14px; }
+.case-back:hover { color: #1d5ad9; }
+.case-review-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.case-review-header h1 { margin: 6px 0 10px; font-weight: 400; font-size: clamp(25px, 3vw, 36px); line-height: 1.25; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.case-review-header p { margin: 0; color: #536580; }
+.case-review-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 24px; border: 1px solid #dbe3ef; border-radius: 16px; background: #fff; gap: 24px; }
+.case-review-summary dt { color: #536580; font-size: 12px; margin-bottom: 6px; }
+.case-review-summary dd { margin: 0; color: #19315e; font-size: clamp(17px, 1.8vw, 24px); font-weight: 600; overflow-wrap: anywhere; }
+.case-review-note { margin: 10px 0 24px; color: #536580; font-size: 12px; }
+.case-review .detail-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); gap: 24px; }
+.case-review .detail-column { min-width: 0; display: flex; flex-direction: column; gap: 24px; padding: 0; border: none; }
+.case-review .detail-section { padding: 24px; background: #fff; border: 1px solid #dbe3ef; border-radius: 16px; box-shadow: none; scroll-margin-top: 24px; }
+.case-review .detail-section.full { grid-column: 1 / -1; }
+.case-review .section-head { flex-wrap: wrap; gap: 8px; }
+.case-review .section-head h2 { margin: 0; font-size: 20px; font-weight: 500; color: #19315e; }
+.case-review .section-body, .case-review .detail-value { overflow-wrap: anywhere; white-space: pre-line; line-height: 1.65; }
+.case-review .detail-label { color: #536580; font-size: 12px; }
+.case-review .agreement-section { border-top: 3px solid #36578f; }
+.case-review .agreement-actions { flex-wrap: wrap; }
+.case-review .agreement-section input[type=file] { max-width: 100%; font-size: 13px; }
+.case-review .file-row { flex-wrap: wrap; gap: 14px; }
+.case-review .file-row > div { min-width: 0; overflow-wrap: anywhere; }
+.case-review .file-row button { flex-shrink: 0; }
+@media (max-width: 1100px) {
+  .workspace-heading { align-items: flex-start; flex-direction: column; }
+  .workspace-search { width: 100%; }
+  .case-review-header { align-items: flex-start; flex-direction: column; }
+  .case-review .detail-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 850px) {
+  .marketplace-workspace { grid-template-columns: minmax(0, 1fr); }
+  .workspace-sidebar { position: relative; height: auto; padding: 16px; }
+  .workspace-brand { padding: 0 0 12px; }
+  .workspace-brand br { display: none; }
+  .workspace-brand span { font-size: 12px; }
+  .workspace-sidebar > .workspace-caption { display: none; }
+  .workspace-sidebar > nav { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .workspace-sidebar nav a { min-height: 44px; padding: 10px; font-size: 12px; }
+  .workspace-case-nav { margin-top: 12px; }
+  .workspace-case-nav nav { display: flex; overflow-x: auto; }
+  .workspace-case-nav nav a { white-space: nowrap; flex-shrink: 0; }
+  .workspace-account { margin: 12px -16px -16px; padding-top: 0; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #ffffff2e; }
+  .workspace-account > span { min-width: 0; }
+  .workspace-account button { width: auto; gap: 16px; border: none; }
+  .workspace-main { padding: 24px 16px; }
+  .case-review .detail-section { padding: 16px; }
+  .case-review-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 18px; gap: 18px; }
+  .marketplace-workspace .pager-actions { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .case-review section { scroll-behavior: smooth; }
+}

@@ -37,3 +37,16 @@ export const updateMarketplaceUserRole = async ({ uid, email, role }) => {
     }
   }
 }
+
+export const fetchConversationalIntakes = async ({ limit = 250 } = {}) => {
+  try {
+    const callable = httpsCallable(functions, 'listConversationalIntakes')
+    const result = await callable({ limit })
+    return { data: result.data?.intakes || [], error: null }
+  } catch (error) {
+    return {
+      data: [],
+      error: toAdminError(error, 'Failed to load conversational intakes'),
+    }
+  }
+}
