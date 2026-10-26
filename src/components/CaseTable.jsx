@@ -36,7 +36,6 @@ const CaseTable = ({ cases, page, pageSize, totalCount, onPageChange, onOpen }) 
               <th>Description</th>
               <th>Damages</th>
               <th>Documents</th>
-              <th aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -50,9 +49,19 @@ const CaseTable = ({ cases, page, pageSize, totalCount, onPageChange, onOpen }) 
                 <tr key={item.id} onClick={() => onOpen?.(item.id)}>
                   <td className="date-cell">{formatDate(item.createdAt)}</td>
                   <td>
-                    <div className="table-description" title={description}>
+                    <a
+                      className="table-description"
+                      title={description}
+                      href={`/cases/${item.id}`}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                        event.preventDefault()
+                        onOpen?.(item.id)
+                      }}
+                    >
                       {displayDescription}
-                    </div>
+                    </a>
                   </td>
                   <td>
                     <div className="table-damages" title={damageSummary(item)}>
@@ -63,27 +72,13 @@ const CaseTable = ({ cases, page, pageSize, totalCount, onPageChange, onOpen }) 
                   <td>
                     <span className="doc-count">{docs}</span>
                   </td>
-                  <td className="action-cell">
-                    <a
-                      href={`/cases/${item.id}`}
-                      className="secondary-btn"
-                      aria-label={`Review case: ${item.title || description.slice(0, 80)}`}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-                        event.preventDefault()
-                        onOpen?.(item.id)
-                      }}
-                    >
-                      Review case
-                    </a>
-                  </td>
+
                 </tr>
               )
             })}
             {cases.length === 0 && (
               <tr>
-                <td colSpan={5}>
+                <td colSpan={4}>
                   <div className="empty-table">No cases match the current filters.</div>
                 </td>
               </tr>

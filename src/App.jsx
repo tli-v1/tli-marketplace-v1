@@ -11,6 +11,7 @@ import {
 import CaseDetail from './components/CaseDetail'
 import WorkspaceSidebar from './components/WorkspaceSidebar'
 import CaseTable from './components/CaseTable'
+import { matchesCaseRanges } from './caseFilters'
 import StateFilter from './components/StateFilter'
 import LawFirmApplicationPage from './pages/LawFirmApplicationPage'
 import AdminPage from './pages/AdminPage'
@@ -63,6 +64,10 @@ function App() {
   const [stateFilter, setStateFilter] = useState(new Set())
   const [practiceFilter, setPracticeFilter] = useState(new Set())
   const [sort, setSort] = useState('created')
+  const [ranges, setRanges] = useState({ damageMin: '', damageMax: '', docsMin: '', docsMax: '' })
+  const activeFilterCount = stateFilter.size + practiceFilter.size
+    + Number(ranges.damageMin !== '' || ranges.damageMax !== '')
+    + Number(ranges.docsMin !== '' || ranges.docsMax !== '')
   const [tablePage, setTablePage] = useState(1)
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
@@ -370,7 +375,7 @@ function App() {
         item.description.toLowerCase().includes(searchLower) ||
         item.incident.description.toLowerCase().includes(searchLower)
 
-      return matchesState && matchesPractice && matchesSearch
+      return matchesState && matchesPractice && matchesSearch && matchesCaseRanges(item, ranges)
     })
 
     const sorted = [...filteredCases]
@@ -385,11 +390,11 @@ function App() {
     }
 
     return sorted.map((item) => ({ ...item, displayState: resolveStateLabel(item) }))
-  }, [search, sort, stateFilter, practiceFilter, cases, resolveStateLabel])
+  }, [search, sort, stateFilter, practiceFilter, ranges, cases, resolveStateLabel])
 
   useEffect(() => {
     setTablePage(1)
-  }, [search, sort, stateFilter, practiceFilter])
+  }, [search, sort, stateFilter, practiceFilter, ranges])
 
   const tableCases = useMemo(() => {
     const start = (tablePage - 1) * tablePageSize
@@ -461,6 +466,7 @@ function App() {
     setPracticeFilter(new Set())
     setSearch('')
     setSort('created')
+    setRanges({ damageMin: '', damageMax: '', docsMin: '', docsMax: '' })
   }
 
   const handleSignup = async (event) => {
@@ -760,7 +766,7 @@ function App() {
         email={userIdentity.email || session.user.email}
         filters={!selectedCaseId && page !== 'profile' && !isAdminPage ? (
           <details className="workspace-filters">
-            <summary>Filter cases{stateFilter.size + practiceFilter.size > 0 ? ` · ${stateFilter.size + practiceFilter.size} active` : ''}</summary>
+            <summary>Filter cases{activeFilterCount > 0 ? ` · ${activeFilterCount} active` : ''}</summary>
           <div className="sidebar-filter-body">
             <div className="sidebar-filter-controls">
               <div className="panel-head">
@@ -793,6 +799,35 @@ function App() {
                   ))}
                 </div>
               </div>
+
+              {[
+                { title: 'Reported damages ($)', min: 'damageMin', max: 'damageMax', step: '0.01' },
+                { title: 'Document count', min: 'docsMin', max: 'docsMax', step: '1' },
+              ].map(({ title, min, max, step }) => (
+                <fieldset className="filter-group range-filter" key={min}>
+                  <legend className="group-title">{title}</legend>
+                  <div className="range-filter-inputs">
+                    {[[min, 'Min'], [max, 'Max']].map(([key, label]) => (
+                      <label key={key}>
+                        <span>{label}</span>
+                        <input type="number" min="0" step={step} placeholder="Any"
+                          aria-label={`${title} ${label.toLowerCase()}`}
+                          value={ranges[key]}
+                          onChange={event => {
+                            const value = event.target.value
+                            if (value === '' || (Number(value) >= 0 && (step !== '1' || Number.isInteger(Number(value))))) {
+                              setRanges(previous => ({ ...previous, [key]: value }))
+                            }
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {ranges[min] !== '' && ranges[max] !== '' && Number(ranges[min]) > Number(ranges[max]) && (
+                    <small className="range-filter-error" role="status">Minimum must not exceed maximum.</small>
+                  )}
+                </fieldset>
+              ))}
 
               <div className="filter-group">
                 <div className="group-title">Sort by</div>

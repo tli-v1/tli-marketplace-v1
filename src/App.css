@@ -942,7 +942,7 @@
   border-radius: 999px;
   color: #0b2545 !important;
   font-size: 12px !important;
-  font-weight: 850 !important;
+  font-weight: 400 !important;
   text-transform: capitalize;
 }
 .role-chip.lawyer {
@@ -1328,16 +1328,8 @@
   white-space: nowrap;
 }
 .doc-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 34px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: #eaf2ff;
   color: #0f2c4b;
-  font-weight: 800;
+  font-weight: 600;
 }
 .action-cell .secondary-btn {
   justify-content: center;

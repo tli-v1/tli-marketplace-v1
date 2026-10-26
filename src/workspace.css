@@ -93,8 +93,6 @@
 .marketplace-workspace .case-table-shell, .marketplace-workspace .case-table-wrap { box-shadow: none; }
 .marketplace-workspace .case-table { min-width: 700px; }
 .marketplace-workspace .case-table th { background: #edf3fc; }
-.marketplace-workspace .case-table th:last-child, .marketplace-workspace .case-table td:last-child { width: 140px; }
-.marketplace-workspace .case-table .secondary-btn { white-space: nowrap; font-size: 12px; padding: 8px 12px; }
 .marketplace-workspace .table-pagination { flex-wrap: wrap; gap: 12px; }
 .marketplace-workspace .profile-page, .marketplace-workspace .admin-page { width: 100%; padding: 0; max-width: none; }
 .workspace-empty { padding: 48px 0; }
@@ -153,3 +151,114 @@
 @media (prefers-reduced-motion: no-preference) {
   .case-review section { scroll-behavior: smooth; }
 }
+
+.sidebar-filter-controls .range-filter { min-width: 0; margin: 14px 0 0; padding: 14px 0 0; border: 0; border-top: 1px solid #ffffff2e; }
+.range-filter legend { padding: 0; }
+.range-filter-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.range-filter-inputs label { display: grid; gap: 5px; min-width: 0; font-size: 11px; }
+.range-filter-inputs input { width: 100%; min-width: 0; padding: 8px; border: 1px solid #dbe3ef; border-radius: 8px; background: #fff; color: #19315e; font: inherit; font-size: 12px; }
+.range-filter-error { display: block; margin-top: 8px; color: #ffd4d4; font-size: 11px; }
+
+/* Table body follows the surrounding workspace typography. */
+.marketplace-workspace .case-table tbody {
+  color: #19315e;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.marketplace-workspace .case-table .date-cell,
+.marketplace-workspace .case-table .table-description,
+.marketplace-workspace .case-table .table-damages strong,
+.marketplace-workspace .case-table .doc-count {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: inherit;
+}
+.marketplace-workspace .case-table .table-damages span {
+  color: #536580;
+  font-weight: 400;
+}
+
+.marketplace-workspace .table-pagination {
+  padding-top: 16px;
+  color: #536580;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.marketplace-workspace .page-indicator {
+  color: #536580;
+  font-size: inherit;
+  font-weight: 400;
+}
+.marketplace-workspace .pager-actions { gap: 12px; }
+.marketplace-workspace .pager-actions .secondary-btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 9px;
+  background: #fff;
+  color: #19315e;
+  font-size: 14px;
+  font-weight: 400;
+  box-shadow: none;
+}
+.marketplace-workspace .pager-actions .secondary-btn:hover:not(:disabled) {
+  background: #edf3fc;
+  border-color: #b8c9e5;
+}
+.marketplace-workspace .pager-actions .secondary-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+@media (max-width: 640px) {
+  .marketplace-workspace .table-pagination { align-items: flex-start; }
+  .marketplace-workspace .pager-actions .secondary-btn { min-height: 44px; }
+}
+
+/* Consistent, lighter typography across every marketplace page. */
+:is(.marketplace-workspace, .auth-shell, .auth-page, .apply-shell) {
+  --text-body: #19315e;
+  --text-muted: #536580;
+  font-weight: 400;
+  line-height: 1.6;
+}
+:is(.workspace-main, .auth-shell, .auth-page, .apply-shell) :is(h1, h2, h3, h4) {
+  color: var(--text-body);
+  font-weight: 500;
+  line-height: 1.3;
+}
+:is(.workspace-main, .apply-shell) h1 { font-weight: 400; letter-spacing: -.025em; }
+:is(.workspace-main, .auth-shell, .auth-page, .apply-shell) :is(p, li, td, strong, b, input, textarea, select) {
+  font-weight: 400;
+}
+:is(.workspace-main, .auth-shell, .auth-page, .apply-shell) :is(button, .primary-btn, .secondary-btn, label, legend) {
+  font-weight: 400;
+}
+:is(.workspace-main, .apply-shell) :is(th, .eyebrow, .panel-title, .group-title) {
+  font-weight: 500;
+}
+.marketplace-workspace :is(.profile-badge, .segmented-control label, .toggle-row strong, .input-label, .input-label span, .detail-label, .detail-value, .file-name, .file-note, .section-sub, .case-review-summary dd, .party-row-head strong, .party-role, .admin-message, .admin-table td span, .admin-stat strong, .admin-stat span, .case-table-total) {
+  font-weight: 400;
+}
+.marketplace-workspace :is(.profile-head p, .settings-section p, .toggle-row small, .admin-hero p, .admin-card p, .section-sub, .detail-label, .file-note) {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.marketplace-workspace :is(.settings-section h2, .profile-head h1, .admin-hero h1, .admin-card h2, .case-review .section-head h2) {
+  color: var(--text-body);
+  font-weight: 500;
+}
+.marketplace-workspace .agreement-section .input-label span {
+  color: var(--text-muted);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.marketplace-workspace .input-label input[type='file']::file-selector-button { font-weight: 400; }
+.apply-shell :is(.apply-intro p, .apply-section p, .apply-section label, .apply-section legend, .certify-row, .radio-group) {
+  font-weight: 400;
+  line-height: 1.6;
+}
+.auth-shell :is(.auth-title, .apply-cta) { font-weight: 500; }
