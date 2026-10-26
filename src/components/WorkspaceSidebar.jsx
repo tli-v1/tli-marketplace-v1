@@ -1,9 +1,42 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { CASE_SECTIONS, activeCaseSection } from '../caseSections'
 
 const Icon = ({ path }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>
 
-export default function WorkspaceSidebar({ caseId, isSettings, isAdmin, canAdmin, adminUrl, navigate, onSignOut, signingOut, email, filters }) {
-  const [section, setSection] = useState('incident')
+export default function WorkspaceSidebar({ caseId, caseReady, isSettings, isAdmin, canAdmin, adminUrl, navigate, onSignOut, signingOut, email, filters }) {
+  const [section, setSection] = useState('overview')
+  useEffect(() => {
+    if (!caseId || !caseReady) return
+    let frame = null
+    const update = () => {
+      frame = null
+      const sections = CASE_SECTIONS.map(([id]) => {
+        const element = document.getElementById(id)
+        return element ? { id, top: element.getBoundingClientRect().top } : null
+      }).filter(Boolean)
+      setSection(activeCaseSection(sections, {
+        viewportHeight: window.innerHeight,
+        scrollY: window.scrollY,
+        pageHeight: document.documentElement.scrollHeight,
+      }))
+    }
+    const scheduleUpdate = () => {
+      if (frame === null) frame = requestAnimationFrame(update)
+    }
+    window.addEventListener('scroll', scheduleUpdate, { passive: true })
+    window.addEventListener('resize', scheduleUpdate)
+    const observer = new ResizeObserver(scheduleUpdate)
+    const content = document.querySelector('.case-review')
+    if (content) observer.observe(content)
+    scheduleUpdate()
+    return () => {
+      window.removeEventListener('scroll', scheduleUpdate)
+      window.removeEventListener('resize', scheduleUpdate)
+      observer.disconnect()
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [caseId, caseReady])
+
   const link = (event, path) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
@@ -30,7 +63,7 @@ export default function WorkspaceSidebar({ caseId, isSettings, isAdmin, canAdmin
       {caseId && <div className="workspace-case-nav">
         <span className="workspace-caption">Case review</span>
         <nav aria-label="Case sections">
-          {Object.entries({ incident: 'Incident & contact', damages: 'Damages', parties: 'Parties & insurance', documents: 'Files & evidence', agreement: 'Lawyer-client agreement' }).map(([id, label]) => (
+          {CASE_SECTIONS.map(([id, label]) => (
             <a key={id} href={`#${id}`} onClick={event => {
               if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
               event.preventDefault()

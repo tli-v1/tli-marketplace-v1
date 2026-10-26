@@ -262,3 +262,78 @@
   line-height: 1.6;
 }
 .auth-shell :is(.auth-title, .apply-cta) { font-weight: 500; }
+
+
+/* Linear case review: one section at a time, in the same order as navigation. */
+.case-review { width: 100%; max-width: none; margin: 0; }
+.case-reference { display: block; margin-top: 12px; color: #536580; font-size: 12px; letter-spacing: .04em; }
+.case-overview { scroll-margin-top: 24px; }
+.case-review-linear { display: flex; flex-direction: column; gap: 0; }
+.case-review-linear .section-body { max-width: none; }
+.case-review-linear .detail-list:not(ul),
+.case-review-linear .narrative-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.case-review-linear .detail-list:not(ul) > .detail-meta-item { display: grid; grid-template-columns: minmax(140px, 220px) minmax(0, 1fr); gap: 20px; padding: 12px 0; border-bottom: 1px solid #edf1f7; }
+.case-review-linear .detail-list:not(ul) > .detail-meta-item:last-child { border-bottom: 0; }
+.case-review-linear .narrative-list > .detail-meta-item { padding: 12px 0; gap: 6px; }
+.case-review-linear .narrative-list .detail-value { max-width: none; }
+.case-review-linear .agreement-box { width: 100%; max-width: none; }
+.case-review-linear .agreement-section .section-body { margin-bottom: 12px; }
+@media (max-width: 640px) {
+  .case-review-linear .detail-list:not(ul) > .detail-meta-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .case-review-linear .section-head { align-items: flex-start; flex-direction: column; }
+}
+
+
+/* One continuous intake sheet, using the entire available workspace width. */
+.case-review-surface { width: 100%; padding: 20px 24px; background: #fff; border: 1px solid #dbe3ef; border-radius: 12px; }
+.case-review-header { margin-bottom: 16px; }
+.case-reference { margin-top: 8px; }
+.case-review .case-review-summary { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.case-review .case-review-note { margin: 8px 0 16px; }
+.case-review .case-overview { border-bottom: 1px solid #e8edf5; }
+.case-review .case-review-linear .detail-section { width: 100%; padding: 16px 0; border: 0; border-bottom: 1px solid #e8edf5; border-radius: 0; box-shadow: none; background: transparent; }
+.case-review .case-review-linear .detail-section:last-child { padding-bottom: 0; border-bottom: 0; }
+.case-review-linear .section-head { margin-bottom: 8px; }
+.case-review-linear .section-body { margin: 8px 0; }
+.case-review-linear .detail-list:not(ul) > .detail-meta-item { padding: 8px 0; }
+.case-review-linear .narrative-list > .detail-meta-item { padding: 8px 0; }
+.case-review-linear .detail-list.stack { gap: 0; margin-bottom: 0; }
+.case-review-linear .detail-list.stack > li { padding: 12px 0; border: 0; border-bottom: 1px solid #edf1f7; border-radius: 0; background: transparent; }
+.case-review-linear .detail-list.stack > li:last-child { border-bottom: 0; }
+.case-review-linear .file-list { margin-bottom: 0; }
+.case-review-linear .file-row { border-radius: 0; border: 0; border-bottom: 1px solid #edf1f7; padding: 10px 0; }
+.case-review-linear .file-row:last-child { border-bottom: 0; }
+@media (max-width: 640px) {
+  .case-review-surface { padding: 16px; }
+  .case-review .case-review-linear .detail-section { padding-block: 14px; }
+}
+
+
+/* Summary-led header and compact, separate panels, matching tli-web-v1. */
+.case-header-context { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 16px; color: #536580; font-size: 13px; }
+.case-header-context span { font-size: 12px; }
+.case-review .case-metrics-header { padding: 12px 0 0; border: 0; }
+.case-review .case-metrics-header .case-review-summary { gap: 20px; }
+.case-review .case-metrics-header .case-review-summary dd { font-size: clamp(20px, 2vw, 28px); }
+.case-review .case-review-surface { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.case-review .case-review-linear { gap: 14px; }
+.case-review .case-review-linear .detail-section,
+.case-review .case-review-linear .detail-section:last-child { padding: clamp(16px, 2vw, 22px); border: 1px solid #dfe5ed; border-radius: 16px; background: #fff; box-shadow: none; }
+.case-review .case-review-linear .section-head { padding: 0; margin-bottom: 14px; border: 0; }
+
+/* Narrative fields use available width instead of forcing stacked lines. */
+.case-review .detail-value { white-space: normal; }
+.case-review-linear .narrative-list > .detail-meta-item {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 20px;
+  border-bottom: 1px solid #edf1f7;
+}
+.case-review-linear .narrative-list > .detail-meta-item:last-child { border-bottom: 0; }
+@media (max-width: 640px) {
+  .case-review-linear .narrative-list > .detail-meta-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}

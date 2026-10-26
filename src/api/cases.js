@@ -23,6 +23,8 @@ const normalizeDataConnectCase = (item) => {
     id: item.id,
     user_id: item.userId,
     status: item.status?.toLowerCase?.() || item.status,
+    consent_store: item.consentStore ?? null,
+    consent_contact: item.consentContact ?? null,
     created_at: item.createdAt,
     updated_at: item.updatedAt,
     incidents: {

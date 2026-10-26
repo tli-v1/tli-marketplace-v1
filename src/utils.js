@@ -54,6 +54,8 @@ export const mapCaseRow = (row) => {
     description: incidentDescription || 'No description provided.',
     valueRange: formatCurrency(totalValue),
     status: row.status || 'review',
+    consentStore: row.consent_store ?? row.consentStore ?? null,
+    consentContact: row.consent_contact ?? row.consentContact ?? null,
     statusLabel: row.status_label || row.status || 'Under review',
     urgencyDays: row.urgency_days ?? 120,
     profileCompleteness: row.profile_completeness ?? 0.5,

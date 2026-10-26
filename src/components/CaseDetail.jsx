@@ -4,7 +4,8 @@ import { getCaseDocSignedUrl } from '../api/cases'
 import LawyerClientAgreement from './LawyerClientAgreement'
 
 const formatDate = (value) => {
-  const parsed = new Date(value)
+  if (!value) return 'Not provided'
+  const parsed = value?.toDate ? value.toDate() : new Date(value)
   return Number.isNaN(parsed.getTime()) ? 'Unknown date' : parsed.toLocaleDateString()
 }
 
@@ -60,7 +61,9 @@ const CaseDetail = ({
 
   const documents = Array.isArray(data.documents) ? data.documents : []
   const parties = Array.isArray(data.parties) ? data.parties : []
-  const locationLabel = `${data.incident.city}, ${data.displayState || data.incident.state}`
+  const locationLabel = [data.incident.city, data.displayState || data.stateCode || data.state || data.incident.state]
+    .filter(value => value && !/^unknown/i.test(value)).join(', ') || 'Location not provided'
+  const consentLabel = value => value === true ? 'Provided' : value === false ? 'Not provided' : 'Not recorded'
   const damageNarrative = [
     ['Injuries', data.damages.injuries],
     ['Treatment', data.damages.treatment],
@@ -100,9 +103,9 @@ const CaseDetail = ({
   return (
     <main className="case-review">
       <a className="case-back" href="/" onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onClose() } }}>← Back to cases</a>
-      <header className="case-review-header">
-        <div><p className="eyebrow">Case review · {locationLabel}</p><h1>{data.title || 'Case details'}</h1><p>Review the intake and supporting evidence before sharing an agreement.</p></div>
-      </header>
+      <header id="overview" className="case-overview case-metrics-header">
+        <h1 className="sr-only">Case review</h1>
+        <p className="case-header-context">{locationLabel}<span title={data.id}>Case {data.id.slice(0, 8).toUpperCase()}</span></p>
       <dl className="case-review-summary">
         <div><dt>Reported financial losses</dt><dd>{data.valueRange}</dd></div>
         <div><dt>Incident date</dt><dd>{formatDate(data.incident.date)}</dd></div>
@@ -110,33 +113,23 @@ const CaseDetail = ({
         <div><dt>Your agreement</dt><dd>{existingAgreement?.files?.length ? 'Uploaded' : 'Not uploaded'}</dd></div>
       </dl>
       <p className="case-review-note">Amounts are reported by the client and have not been independently verified.</p>
-      <div className="case-review-body">
-        <div className="detail-grid">
-          <div className="detail-column">
-            <section className="detail-section" id="incident">
+      </header>
+      <article className="case-review-surface" aria-label="Case intake and agreement">
+      <div className="case-review-body case-review-linear">
+        <section className="detail-section" id="incident">
               <div className="section-head">
-                <h2>Incident details</h2>
-                <span className="section-sub">{locationLabel}</span>
+                <h2>Incident facts</h2>
               </div>
               <p className="section-body">{data.incident.description || 'No incident narrative provided.'}</p>
               <div className="detail-list">
                 <DetailMeta label="Date" value={formatDate(data.incident.date)} />
                 <DetailMeta label="Location details" value={data.incident.locationDetails} />
-                <DetailMeta
-                  label="Contact"
-                  value={`${data.caseContact.fullName || '—'} • ${data.caseContact.method || '—'}`}
-                />
-                <DetailMeta label="Email" value={data.caseContact.email} />
-                <DetailMeta label="Phone" value={data.caseContact.phone} />
-                <DetailMeta label="Documents" value={`${documents.length}`} />
-                <DetailMeta label="Reported losses" value={data.valueRange} />
               </div>
             </section>
 
-            <section className="detail-section" id="parties">
+        <section className="detail-section" id="parties">
               <div className="section-head">
-                <h2>Parties</h2>
-                <span className="section-sub">Plaintiff / defendant / insurer</span>
+                <h2>Parties & insurance</h2>
               </div>
               {parties.length === 0 ? (
                 <p className="section-body">No parties listed.</p>
@@ -159,15 +152,12 @@ const CaseDetail = ({
                 </ul>
               )}
             </section>
-          </div>
 
-          <div className="detail-column">
-            <section className="detail-section" id="damages">
+        <section className="detail-section" id="damages">
               <div className="section-head">
                 <h2>Damages</h2>
-                <span className="section-sub">Financial snapshot</span>
               </div>
-              <div className="detail-list two-col">
+              <div className="detail-list case-financial-list">
                 <DetailMeta label="Medical" value={formatCurrency(data.medicalDamageUsd)} />
                 <DetailMeta label="Property damage" value={formatCurrency(data.propertyDamageUsd)} />
                 <DetailMeta label="Other expenses" value={formatCurrency(data.otherExpensesUsd)} />
@@ -184,26 +174,9 @@ const CaseDetail = ({
               )}
             </section>
 
-            {onSubmitAgreement && (
-              <section className="detail-section agreement-section" id="agreement">
-                <div className="section-head"><h2>Lawyer-client agreement</h2></div>
-                <LawyerClientAgreement
-                  caseId={data.id}
-                  existingAgreement={existingAgreement}
-                  agreementState={agreementState}
-                  onSubmitAgreement={onSubmitAgreement}
-                />
-              </section>
-            )}
-          </div>
-
-          <section className="detail-section full" id="documents">
+        <section className="detail-section" id="documents">
             <div className="section-head">
-              <h2>Files & Evidence</h2>
-              <span className="section-sub">
-                {documents.length} file
-                {documents.length === 1 ? '' : 's'}
-              </span>
+              <h2>Files & evidence</h2>
             </div>
             {documents.length === 0 && <p className="section-body">No files attached to this case yet.</p>}
             <ul className="file-list">
@@ -234,8 +207,33 @@ const CaseDetail = ({
               })}
             </ul>
           </section>
-        </div>
+
+        <section className="detail-section" id="client">
+          <div className="section-head"><h2>Client & contact</h2></div>
+          <div className="detail-list case-contact-list">
+            <DetailMeta label="Client name" value={data.caseContact.fullName} />
+            <DetailMeta label="Preferred contact method" value={formatRole(data.caseContact.method)} />
+            <DetailMeta label="Email" value={data.caseContact.email} />
+            <DetailMeta label="Phone" value={data.caseContact.phone} />
+            <DetailMeta label="Contact consent" value={consentLabel(data.consentContact)} />
+            <DetailMeta label="Information storage consent" value={consentLabel(data.consentStore)} />
+          </div>
+        </section>
+
+        {onSubmitAgreement && (
+          <section className="detail-section agreement-section" id="agreement">
+            <div className="section-head"><h2>Lawyer-client agreement</h2></div>
+            <p className="section-body">When you are ready to proceed, upload a signed PDF agreement and an accompanying message for the client.</p>
+            <LawyerClientAgreement
+              caseId={data.id}
+              existingAgreement={existingAgreement}
+              agreementState={agreementState}
+              onSubmitAgreement={onSubmitAgreement}
+            />
+          </section>
+        )}
       </div>
+      </article>
     </main>
   )
 }

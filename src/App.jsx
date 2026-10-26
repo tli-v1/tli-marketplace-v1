@@ -759,7 +759,7 @@ function App() {
     <div className="app-shell marketplace-workspace">
       <a className="workspace-skip" href="#workspace-content">Skip to content</a>
       <WorkspaceSidebar
-        key={selectedCaseId || 'workspace'} caseId={selectedCaseId}
+        key={selectedCaseId || 'workspace'} caseId={selectedCaseId} caseReady={Boolean(selectedCase)}
         isSettings={page === 'profile'} isAdmin={currentPath === '/admin'}
         canAdmin={['admin', 'owner'].includes(userRole)} adminUrl={import.meta.env.VITE_ADMIN_URL}
         navigate={navigateTo} onSignOut={handleSignOut} signingOut={signOutLoading}
