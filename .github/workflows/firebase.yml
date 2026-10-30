@@ -1,0 +1,135 @@
+name: Marketplace CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_functions:
+        description: Also deploy marketplace Cloud Functions (requires runtime secrets and additional IAM roles)
+        type: boolean
+        default: false
+      deploy_dataconnect:
+        description: Also deploy the shared Data Connect schema/connector (coordinate with tli-web-v1 first)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Do not interrupt a deployment midway through publishing its backend/client.
+concurrency:
+  group: marketplace-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
+  cancel-in-progress: false
+
+env:
+  FIREBASE_PROJECT_ID: peak-bit-486121-n6
+  FIREBASE_CLI_VERSION: 15.8.0
+  CI: 'true'
+
+jobs:
+  checks:
+    name: Lint, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+      - name: Set up Java for the Firestore emulator
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Firebase CLI
+        run: npm install --global "firebase-tools@$FIREBASE_CLI_VERSION"
+      # npm ci needs this gitignored local file dependency to exist first.
+      - name: Generate Data Connect SDK
+        run: firebase dataconnect:sdk:generate --project "$FIREBASE_PROJECT_ID" --non-interactive
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix functions
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Profile integration tests (emulator)
+        run: npm run test:integration:profiles
+      - name: Intake and email integration test (local SMTP capture)
+        run: npm run test:integration:intake
+      - name: Build client
+        env:
+          VITE_ADMIN_URL: ${{ vars.VITE_ADMIN_URL }}
+        run: npm run build
+      - name: Upload tested client
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: marketplace-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy production
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://peak-bit-486121-n6-74a84.web.app
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      DEPLOY_FUNCTIONS: ${{ inputs.deploy_functions || vars.DEPLOY_FUNCTIONS == 'true' }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - name: Validate deployment configuration
+        run: |
+          test -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" || { echo 'Set repository variable GCP_WORKLOAD_IDENTITY_PROVIDER. See docs/ci-cd.md.'; exit 1; }
+          test -n "$GCP_SERVICE_ACCOUNT" || { echo 'Set repository variable GCP_SERVICE_ACCOUNT. See docs/ci-cd.md.'; exit 1; }
+      - name: Install Firebase CLI
+        run: npm install --global "firebase-tools@$FIREBASE_CLI_VERSION"
+      - name: Install function dependencies
+        if: env.DEPLOY_FUNCTIONS == 'true'
+        run: npm ci --prefix functions
+      - name: Download tested client
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: marketplace-dist
+          path: dist/
+      - name: Authenticate to Google Cloud (OIDC)
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ env.FIREBASE_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Deploy Data Connect
+        if: inputs.deploy_dataconnect
+        # No --force or automatic SQL migration: fail if acknowledgement is needed.
+        run: firebase deploy --only dataconnect --project "$FIREBASE_PROJECT_ID" --non-interactive
+      - name: Deploy marketplace functions
+        if: env.DEPLOY_FUNCTIONS == 'true'
+        run: firebase deploy --only functions:marketplace-admin --project "$FIREBASE_PROJECT_ID" --non-interactive
+      - name: Deploy client
+        run: firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" --non-interactive
+      - name: Verify live HTML and assets
+        run: node scripts/verify-hosting.mjs

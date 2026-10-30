@@ -13,7 +13,8 @@
     "test:integration:application": "node test/integration/lawFirmApplication.integration.mjs",
     "test:integration:intake": "firebase emulators:exec --config firebase.integration.json --only auth,firestore,dataconnect --project peak-bit-486121-n6 \"node --test --test-force-exit test/integration/intakeEmail.integration.mjs\"",
     "test:intake:email": "RUN_LIVE_INTAKE_EMAIL=1 node --env-file-if-exists=.env.test.local --test --test-force-exit test/integration/intakeEmail.integration.mjs",
-    "test:notifications": "node --test test/unit/caseIds.test.mjs"
+    "test:notifications": "node --test test/unit/caseIds.test.mjs",
+    "test": "node --test test/unit/*.test.mjs"
   },
   "dependencies": {
     "@dataconnect/generated": "file:src/dataconnect-generated",

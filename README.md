@@ -151,3 +151,10 @@ retried; only `sent` records suppress another send.
 
 References: [Google app passwords](https://support.google.com/accounts/answer/185833),
 [Nodemailer Gmail](https://nodemailer.com/guides/using-gmail).
+
+## GitHub Actions CI/CD
+
+See [CI/CD setup](docs/ci-cd.md) for the required repository variables and one-time
+Google Cloud OIDC setup. Pull requests run lint/tests/build; successful pushes to
+`main` deploy the tested client to Hosting. Functions and the shared Data Connect
+connector can be deployed through explicit workflow options.

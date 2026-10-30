@@ -45,7 +45,10 @@ yarn-error.log*
 dataconnect/.dataconnect/
 *.generated.dart
 src/dataconnect-generated*
-dist/assets/*
+dist/*
 
 *.log
 *.rules
+
+# Temporary Google GitHub Actions OIDC credential files
+gha-creds-*.json
